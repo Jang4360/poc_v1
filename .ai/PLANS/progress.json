@@ -1,0 +1,57 @@
+{
+  "sprint_name": "busan-eumgil-mvp-plan",
+  "updated_at": "2026-04-23",
+  "summary": {
+    "planned": 6,
+    "completed": 3,
+    "in_progress": 0,
+    "blocked": 0,
+    "progress_percentage": 50.0,
+    "quality_adjusted_progress": 45.0,
+    "confidence_score": 0.9
+  },
+  "items": [
+    {
+      "id": "IEUM-PLAN-01",
+      "title": "구현 기반 정렬",
+      "status": "completed",
+      "stage": "Build",
+      "verification": "01-setup-and-repo-alignment.md 구현 및 검증 완료: Spring Boot 식별자/의존성/설정, db/schema.sql 7개 테이블, ETL 골격, GraphHopper 경계, Docker Compose, verify/smoke 통과"
+    },
+    {
+      "id": "IEUM-PLAN-02",
+      "title": "SHP 기반 보행 네트워크 생성",
+      "status": "completed",
+      "stage": "Build",
+      "verification": "02-shp-network-load.md 구현 및 검증 완료: N3L_A0020000_26 SHP에서 road_nodes 229,129건, road_segments 248,458건 생성 및 PostGIS 적재, topology/post-load 검증 0건 오류, DB 기반 HTML preview 생성, full stage 통과"
+    },
+    {
+      "id": "IEUM-PLAN-03",
+      "title": "CSV 및 정적 참조 기반 보강 ETL",
+      "status": "completed",
+      "stage": "Build",
+      "verification": "03-csv-etl-and-reference-data.md 구현 및 검증 완료: places 13,564건, place_accessibility_features 42,368건, low_floor_bus_routes 146건, subway_station_elevators 231건, segment_features 172,823건 적재. slope_analysis_staging.csv 129,085건, N3L_A0033320 WIDTH 18,604건/SURFACE 19,858건, N3A_C0390000 STAIRS 902건, 연속수치지도 증적 우선 레이어 1,960건 적재. post-load FK/matchStatus 검증 0건 오류"
+    },
+    {
+      "id": "IEUM-PLAN-04",
+      "title": "GraphHopper 분기 프로필 구성",
+      "status": "pending",
+      "stage": "Plan",
+      "verification": "04-graphhopper-routing-profiles_v2.md 기준으로 encoded value와 4개 custom model 계획을 정리해야 함"
+    },
+    {
+      "id": "IEUM-PLAN-05",
+      "title": "Spring Boot API와 대중교통 오케스트레이션",
+      "status": "pending",
+      "stage": "Plan",
+      "verification": "05-backend-api-and-orchestration.md 기준으로 핵심 API와 필터링 로직 구성"
+    },
+    {
+      "id": "IEUM-PLAN-06",
+      "title": "검증 시연과 V2 경계 정리",
+      "status": "pending",
+      "stage": "Plan",
+      "verification": "06-validation-demo-and-v2-boundary.md 기준으로 smoke와 시연 범위 정리"
+    }
+  ]
+}

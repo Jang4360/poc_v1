@@ -1,0 +1,11 @@
+.claude/settings.local.json
+.claude/worktrees/
+.DS_Store
+# Local ETL data and environment
+etl/raw/
+etl/.venv/
+etl/.pytest_cache/
+.env
+runtime/
+__pycache__/
+*.pyc

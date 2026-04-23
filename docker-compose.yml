@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ieumgil}
+      POSTGRES_USER: ${POSTGRES_USER:-ieumgil}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ieumgil}
+    ports:
+      - "${POSTGRES_HOST_PORT:-15432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  graphhopper:
+    build:
+      context: ./docker/graphhopper
+    environment:
+      GRAPHHOPPER_PROFILES: visual_safe,visual_fast,wheelchair_safe,wheelchair_fast
+    ports:
+      - "${GRAPHHOPPER_HOST_PORT:-18989}:8989"
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/graphhopper-ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./poc
+    depends_on:
+      postgres:
+        condition: service_healthy
+      graphhopper:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ieumgil}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-ieumgil}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-ieumgil}
+      GRAPHHOPPER_BASE_URL: http://graphhopper:8989
+    ports:
+      - "${BACKEND_HOST_PORT:-18080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:

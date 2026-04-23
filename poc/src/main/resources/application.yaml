@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: ieumgil-backend
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:15432/ieumgil}
+    username: ${SPRING_DATASOURCE_USERNAME:ieumgil}
+    password: ${SPRING_DATASOURCE_PASSWORD:ieumgil}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        globally_quoted_identifiers: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+ieumgil:
+  graphhopper:
+    base-url: ${GRAPHHOPPER_BASE_URL:http://localhost:8989}
