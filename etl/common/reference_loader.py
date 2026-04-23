@@ -62,6 +62,8 @@ CONTINUOUS_EVIDENCE_LAYERS = (
 CONTINUOUS_EVIDENCE_AUTO_M = 5.0
 CONTINUOUS_EVIDENCE_REVIEW_M = 10.0
 TM5179_TO_WGS84 = Transformer.from_crs("EPSG:5179", "EPSG:4326", always_xy=True)
+_schema_ensured = False
+
 QUAL_TO_SURFACE_STATE = {
     "SWQ000": "UNKNOWN",
     "SWQ001": "PAVED",
@@ -241,6 +243,9 @@ def shape_to_wkt_4326(shape: shapefile.Shape) -> str:
 
 
 def ensure_reference_schema() -> None:
+    global _schema_ensured
+    if _schema_ensured:
+        return
     statements = [
         'ALTER TABLE segment_features ADD COLUMN IF NOT EXISTS "sourceDataset" VARCHAR(160)',
         'ALTER TABLE segment_features ADD COLUMN IF NOT EXISTS "sourceLayer" VARCHAR(80)',
@@ -258,6 +263,7 @@ def ensure_reference_schema() -> None:
             for statement in statements:
                 cur.execute(statement)
         conn.commit()
+    _schema_ensured = True
 
 
 def diff_place_csvs() -> dict[str, Any]:
@@ -483,7 +489,7 @@ def load_crosswalks(*, dry_run: bool = False) -> dict[str, Any]:
     ensure_reference_schema()
     with connect() as conn:
         with conn.cursor() as cur:
-            cur.execute('UPDATE road_segments SET "crossingState" = %s::crossing_state, "widthMeter" = NULL', ("UNKNOWN",))
+            cur.execute('UPDATE road_segments SET "crossingState" = %s::crossing_state', ("UNKNOWN",))
             reset_segment_feature_types(cur, ["CROSSWALK"])
             for row in candidates:
                 lon, lat = parse_wkt_point(row["point"])
@@ -503,7 +509,7 @@ def load_crosswalks(*, dry_run: bool = False) -> dict[str, Any]:
                         """
                         UPDATE road_segments
                         SET "crossingState" = %s::crossing_state,
-                            "widthMeter" = COALESCE(%s, "widthMeter")
+                            "widthMeter" = COALESCE("widthMeter", %s)
                         WHERE "edgeId" = %s
                         """,
                         (normalize_crossing_state(row.get("crossingState", "")), parse_optional_float(row["widthMeter"]), edge_id),
@@ -820,6 +826,9 @@ def load_continuous_width_surface(*, dry_run: bool = False) -> dict[str, Any]:
         with conn.cursor() as cur:
             reset_segment_feature_types(cur, ["WIDTH", "SURFACE"])
             cur.execute(
+                "UPDATE road_segments SET \"widthMeter\" = NULL, \"widthState\" = 'UNKNOWN'::width_state, \"surfaceState\" = 'UNKNOWN'"
+            )
+            cur.execute(
                 """
                 CREATE TEMP TABLE tmp_n3l_a0033320 (
                     "sourceRowNumber" INTEGER,
@@ -839,7 +848,7 @@ def load_continuous_width_surface(*, dry_run: bool = False) -> dict[str, Any]:
                     "sourceRowNumber", "district", "ufid", "widthMeter",
                     "surfaceState", "qual", "properties", "geom"
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, ST_SetSRID(ST_GeomFromText(%s), 4326))
+                VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, ST_SetSRID(ST_MakeValid(ST_GeomFromText(%s)), 4326))
                 """,
                 rows,
             )
@@ -881,8 +890,10 @@ def load_continuous_width_surface(*, dry_run: bool = False) -> dict[str, Any]:
                 SELECT *
                 FROM ranked
                 WHERE rn = 1
+                  AND feature_length_m IS NOT NULL
+                  AND overlap_m / feature_length_m >= %s
                 """,
-                (N3L_A0033320_AUTO_M, N3L_A0033320_AUTO_M),
+                (N3L_A0033320_AUTO_M, N3L_A0033320_AUTO_M, N3L_A0033320_OVERLAP_RATIO),
             )
             cur.execute('CREATE INDEX tmp_n3l_a0033320_match_edge ON tmp_n3l_a0033320_match ("edgeId")')
             cur.execute('SELECT COUNT(DISTINCT "sourceRowNumber") FROM tmp_n3l_a0033320_match')
@@ -1025,7 +1036,7 @@ def load_continuous_stairs(*, dry_run: bool = False) -> dict[str, Any]:
                 INSERT INTO tmp_n3a_c0390000 (
                     "sourceRowNumber", "district", "ufid", "stru", "properties", "geom"
                 )
-                VALUES (%s, %s, %s, %s, %s::jsonb, ST_SetSRID(ST_GeomFromText(%s), 4326))
+                VALUES (%s, %s, %s, %s, %s::jsonb, ST_SetSRID(ST_MakeValid(ST_GeomFromText(%s)), 4326))
                 """,
                 rows,
             )
@@ -1344,14 +1355,16 @@ def load_slope_analysis(*, dry_run: bool = False) -> dict[str, Any]:
                 )
                 SELECT *
                 FROM ranked
-                WHERE rn = 1 AND match_score >= %s
-                """,
-                (SLOPE_OVERLAP_RATIO,),
+                WHERE rn = 1
+                """
             )
             cur.execute('CREATE INDEX tmp_slope_analysis_match_edge ON tmp_slope_analysis_match ("edgeId")')
-            cur.execute('SELECT COUNT(DISTINCT "sourceRowNumber") FROM tmp_slope_analysis_match')
+            cur.execute('SELECT COUNT(DISTINCT "sourceRowNumber") FROM tmp_slope_analysis_match WHERE match_score >= %s', (SLOPE_OVERLAP_RATIO,))
             stats.matched_rows = int(cur.fetchone()[0])
-            stats.unmatched_rows = len(temp_rows) - stats.matched_rows
+            cur.execute('SELECT COUNT(DISTINCT "sourceRowNumber") FROM tmp_slope_analysis_match WHERE match_score < %s', (SLOPE_OVERLAP_RATIO,))
+            low_overlap_skipped = int(cur.fetchone()[0])
+            stats.details["low_overlap_skipped"] = low_overlap_skipped
+            stats.unmatched_rows = len(temp_rows) - stats.matched_rows - low_overlap_skipped
             cur.execute(
                 """
                 WITH agg AS (
@@ -1360,6 +1373,7 @@ def load_slope_analysis(*, dry_run: bool = False) -> dict[str, Any]:
                         AVG("metricMean") FILTER (WHERE "metricMean" IS NOT NULL) AS avg_metric,
                         AVG("widthMeter") FILTER (WHERE "widthMeter" IS NOT NULL AND "widthMeter" > 0) AS avg_width
                     FROM tmp_slope_analysis_match
+                    WHERE match_score >= %s
                     GROUP BY "edgeId"
                 )
                 UPDATE road_segments rs
@@ -1377,7 +1391,8 @@ def load_slope_analysis(*, dry_run: bool = False) -> dict[str, Any]:
                     END
                 FROM agg
                 WHERE rs."edgeId" = agg."edgeId"
-                """
+                """,
+                (SLOPE_OVERLAP_RATIO,),
             )
             stats.details["slope_updated_segments"] = cur.rowcount
             cur.execute(
@@ -1390,8 +1405,9 @@ def load_slope_analysis(*, dry_run: bool = False) -> dict[str, Any]:
                     "edgeId", 'SLOPE_ANALYSIS', "geom", %s, 'slope_analysis_staging',
                     "sourceRowNumber", 'MATCHED', match_score, "properties"
                 FROM tmp_slope_analysis_match
+                WHERE match_score >= %s
                 """,
-                (SLOPE_SOURCE_DATASET,),
+                (SLOPE_SOURCE_DATASET, SLOPE_OVERLAP_RATIO),
             )
             stats.loaded_rows = cur.rowcount
         conn.commit()
