@@ -13,6 +13,7 @@
 - 공식 도로 중심선 SHP를 PostGIS 정규 그래프 테이블로 적재
 - OSM natural key 의존 제거
 - SHP 종단점 기반 결정적 노드 식별 생성
+- 분기 구간의 near-miss endpoint를 junction 단위로 정규화
 - preflight, extract, topology audit, DB load, post-load validation, HTML visualization 단계 분리
 - 후속 워크스트림의 기준 키를 `edgeId`로 고정
 
@@ -39,6 +40,7 @@
 - [x] `N3L_A0020000_26`을 `road_segments`의 정규 네트워크 소스로 고정한다.
 - [x] OSM 전용 식별 컬럼을 소스 비종속 스키마로 대체한다.
 - [x] SHP에서 `road_nodes`, `road_segments`를 결정적으로 파생하는 규칙을 정의한다.
+- [x] 분기 구간의 endpoint cluster를 `2m` 반경 junction 정규화 규칙으로 축소한다.
 - [x] `road_nodes`, `road_segments`를 PostGIS DB에 실제 적재한다.
 - [x] topology audit, DB load, post-load validation을 명시적 단계로 분리한다.
 - [x] DB에 적재된 node/edge를 지도 위에 그리는 HTML 결과물을 생성한다.
@@ -52,6 +54,10 @@
   - 신규: `edgeId`
 - `road_nodes`의 정체성은 OSM node id가 아니라 정규화된 SHP 좌표에서 파생한다.
 - `road_segments`의 정체성은 SHP `UFID`가 아니라 `edgeId`로 관리한다. 이번 POC에서는 `N3L_A0020000_26`을 고정 기준 네트워크로 보고 반복 재적재를 전제로 하지 않는다.
+- raw SHP part의 내부 vertex는 node로 승격하지 않고 geometry에만 유지한다.
+- 분기점 정규화는 raw endpoint dedupe만으로 끝내지 않고 `2m` 반경의 endpoint-to-segment snap을 적용해 수행한다.
+- junction 정규화 순서는 `raw segment 생성 -> endpoint를 인접 segment interior에 2m 이내로 snap -> snap 지점에서 segment split -> 0.5m 이내 node-to-node merge`로 고정한다.
+- `2m` 반경은 분기부 near-miss를 줄이기 위한 기본값이며, 평행 도로나 비연결 선형의 오결합을 피하기 위해 endpoint만 snap 대상으로 삼는다.
 - `walkAccess`는 적재 시점에 `UNKNOWN`으로 유지하고, 후속 보강 단계가 별도로 판단한다.
 - topology audit는 라인 적재와 분리된 독립 단계로 유지한다.
 
@@ -68,12 +74,21 @@
   - 결정적 endpoint key 생성과 고정 SHP 순서 기반 `vertexId` 생성
   - snapshot CSV와 topology audit 산출물 생성
   - PostGIS `road_nodes`, `road_segments` 적재 흐름
+- [x] `etl/common/centerline_loader.py`에 junction normalization 단계를 추가한다.
+  - raw SHP part를 먼저 `SegmentSnapshot` 후보로 생성한다.
+  - 각 endpoint에 대해 다른 segment의 interior에 대한 최근접 후보를 찾고, `2m` 이내일 때만 snap한다.
+  - snap된 위치가 기존 endpoint가 아니면 대상 segment를 split해 공통 junction node를 만든다.
+  - split 이후 `0.5m` 이내 node cluster를 재병합해 동일 junction에 남은 중복 node를 제거한다.
+  - snap/merge 전후 node 수, segment 수, junction collapse 건수를 별도 리포트로 남긴다.
 - [x] `etl/scripts/01_centerline_load.py`를 추가한다.
   - `preflight`, `extract-shp`, `topology-audit`, `load-db`, `post-load-validate`, `visualize-html`, `full` 단계 제공
   - snapshot CSV가 있으면 `load-db` 단계에서 SHP 재파싱 없이 적재 가능
   - `load-db`는 `road_nodes`와 `road_segments`에 insert하고, 적재된 DB count를 리포트로 남긴다.
   - `post-load-validate`는 DB에 적재된 값 기준으로 orphan edge, invalid geometry, SRID, length, count를 검증한다.
   - `visualize-html`은 DB에서 `road_nodes`와 `road_segments`를 조회해 Leaflet 기반 HTML 지도를 생성한다.
+- [x] `etl/scripts/01_centerline_load.py`의 topology audit와 보고서를 junction normalization aware하게 확장한다.
+  - snap 반경 `2m`, node merge 반경 `0.5m`를 실행 파라미터와 리포트에 명시한다.
+  - branch area별 raw endpoint count와 normalized junction count를 비교 가능하게 남긴다.
 - [x] `etl/scripts/01_osm_load.py`를 정규 진입점에서 제외한다.
   - `01_centerline_load.py`가 정규 로더라는 메시지만 출력하도록 한다.
 - [x] 핸드오프 문서를 갱신한다.
@@ -86,9 +101,11 @@
 - 정규 로더: `etl/scripts/01_centerline_load.py`
 - 공통 구현: `etl/common/centerline_loader.py`, `etl/common/db.py`
 - 단위 테스트: `etl/tests/test_db.py`, `etl/tests/test_centerline_loader.py`
-- 생성 노드 수: `229,129`
-- 생성 세그먼트 수: `248,458`
-- topology audit: duplicate edge `0`, orphan edge `0`, invalid length `0`, connected components `1,241`
+- 정규화 전 노드 수: `229,129`
+- 정규화 후 노드 수: `221,841`
+- 정규화 후 세그먼트 수: `245,711`
+- junction normalization: snapped endpoint `23,949`, split insertion `10,813`, node reduction `7,288`
+- topology audit: duplicate edge `0`, orphan edge `0`, invalid length `0`, connected components `1,126`
 - DB post-load validation: orphan edge `0`, invalid geometry `0`, invalid SRID `0`, invalid length `0`, duplicate edgeId `0`
 - HTML preview: `runtime/etl/centerline-load/road_network_preview.html`
 
@@ -108,7 +125,7 @@
 
 - `load-db` 단계는 `db/schema.sql`이 적용된 PostGIS DB를 대상으로 한다.
 - 적재 대상은 `road_nodes`, `road_segments` 두 테이블이다.
-- `road_nodes.vertexId`는 endpoint 기반 노드 식별자이며 `road_segments.fromNodeId`, `road_segments.toNodeId`가 이를 참조한다.
+- `road_nodes.vertexId`는 junction normalization 이후 확정된 노드 식별자이며 `road_segments.fromNodeId`, `road_segments.toNodeId`가 이를 참조한다.
 - `road_segments.edgeId`는 정규 간선 PK이며 후속 CSV ETL, GraphHopper import, HTML 검증의 공통 기준이다.
 - `load-db` 완료 후에는 반드시 `post-load-validate`를 실행해 DB에 실제로 적재됐는지 검증한다.
 
@@ -130,6 +147,9 @@
 - [x] `python etl/scripts/01_centerline_load.py --stage preflight`로 SHP sidecar, CRS, DBF 인코딩, 원본 레코드 수를 확인한다.
 - [x] `python etl/scripts/01_centerline_load.py --stage extract-shp`로 snapshot 산출물을 생성한다.
 - [x] `python etl/scripts/01_centerline_load.py --stage topology-audit`로 파생 세그먼트, 파생 노드, invalid geometry, 중복 edge identity, orphan endpoint, connected component를 확인한다.
+- [x] junction normalization 적용 후 raw node `229,129` 대비 normalized node `221,841`로 감소했는지 확인한다.
+- [ ] `2m` snap이 평행 도로나 비연결 인접 선형을 잘못 병합하지 않는지 near-miss 사례를 수동 검토한다.
+- [x] topology audit에 snap 건수, split 건수, junction collapse 건수, normalization 이후 degree 분포를 추가한다.
 - [x] `python etl/scripts/01_centerline_load.py --stage load-db`로 `road_nodes`, `road_segments`에 실제 적재한다.
 - [x] `python etl/scripts/01_centerline_load.py --stage post-load-validate`로 DB count, FK orphan, invalid geometry, SRID, length 값, duplicate edge key를 검증한다.
 - [x] `python etl/scripts/01_centerline_load.py --stage visualize-html`로 DB 기반 HTML 지도를 생성한다.
@@ -142,6 +162,9 @@
 
 - `N3L_A0020000_26`은 보도 전용이 아니라 도로 중심선 데이터다.
 - `RDDV`, `DVYN`, `ONSD` 값은 현재 trace용 참고 정보이며, 직접적인 라우팅 규칙은 아니다.
+- raw endpoint 기반 적재만 유지하면 분기 구간에서 하나의 junction가 2개에서 4개의 node cluster로 보일 수 있다.
+- `2m` snap 반경은 현재 권장 기본값이지만, 실제 오결합 사례가 보이면 도로 폭이 좁은 지역과 평행 선형 밀집 지역을 기준으로 재조정해야 한다.
+- junction normalization 이후에도 `invalid_normalized_segments 13,548`이 제외됐으므로, 제거된 극단적 단거리 세그먼트가 의도치 않은 손실인지 후속 샘플 검토가 필요하다. → 샘플 확인 결과 교차로 digitizing 잡음으로 판정, accept.
 - 연결 컴포넌트와 near-miss endpoint 수치를 보면 라우팅 품질 개선은 `04`에서 계속 다뤄야 한다.
 - `03`의 실제 접근성 CSV와 `edgeId` 기반 공간 매칭 검증은 다음 워크스트림 과제로 남아 있다.
 

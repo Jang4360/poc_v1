@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Haeundae Subway Elevator Preview</title>
+  <style>
+    html, body, #map {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      background: #f8fafc;
+      font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #0f172a;
+    }
+    .map-shell {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    .panel {
+      position: absolute;
+      z-index: 700;
+      top: 12px;
+      left: 12px;
+      width: min(470px, calc(100vw - 24px));
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, 0.12);
+    }
+    .panel h1 {
+      margin: 0 0 8px;
+      font-size: 15px;
+    }
+    .panel p {
+      margin: 0 0 10px;
+      color: #334155;
+    }
+    .warning {
+      padding: 8px 10px;
+      background: #eff6ff;
+      border: 1px solid #93c5fd;
+      color: #1d4ed8;
+      font-size: 12px;
+    }
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 6px 10px;
+      margin-top: 8px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .legend-swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 23, 42, 0.18);
+      flex: 0 0 auto;
+    }
+    .legend-line {
+      width: 16px;
+      height: 0;
+      border-top: 2px dashed #2563eb;
+      flex: 0 0 auto;
+    }
+    .legend-label {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .info-window {
+      min-width: 240px;
+      padding: 10px 12px;
+      font: 12px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #0f172a;
+    }
+    .info-window strong {
+      display: inline-block;
+      min-width: 120px;
+      color: #334155;
+    }
+    .info-window pre {
+      white-space: pre-wrap;
+      margin: 0 0 6px;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <section class="map-shell">
+    <div id="map"></div>
+    <div class="panel">
+      <h1>Haeundae Subway Elevator Preview</h1>
+      <p>center (35.1631, 129.1635), radius 5000m, elevators 23, skipped(no coordinate) 0</p>
+      <p>Stations: 민락 4, 센텀시티 4, 중동 4, 광안 2, 금련산 2, 동백 2, 벡스코 2, 해운대 2</p>
+      <p>CSV: subway_station_elevators_erd_ready.csv</p>
+      <p id="host-warning" class="warning" hidden></p>
+      <div class="legend">
+        <div class="legend-item">
+          <span class="legend-swatch" style="background:#22c55e"></span>
+          <span class="legend-label">Subway elevator</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-swatch" style="background:#0f172a"></span>
+          <span class="legend-label">Haeundae Station center</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-line"></span>
+          <span class="legend-label">5km radius</span>
+        </div>
+      </div>
+    </div>
+  </section>
+  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=fc0455f117ec0c48766f39c9673f18f0&libraries=services"></script>
+  <script>
+    const payload = {"meta": {"title": "Haeundae Subway Elevator Preview", "centerLat": 35.1631, "centerLon": 129.1635, "radiusMeter": 5000, "elevatorCsv": "C:\\Users\\SSAFY\\poc_v1\\etl\\raw\\subway_station_elevators_erd_ready.csv", "localhostUrl": "http://127.0.0.1:3000/etl/haeundae_subway_elevator_preview.html", "outputHtml": "C:\\Users\\SSAFY\\poc_v1\\etl\\haeundae_subway_elevator_preview.html", "outputGeojson": "C:\\Users\\SSAFY\\poc_v1\\etl\\haeundae_subway_elevator_preview.geojson"}, "summary": {"elevatorCount": 23, "skippedNoCoordinate": 0, "stationCounts": [{"name": "민락", "count": 4}, {"name": "센텀시티", "count": 4}, {"name": "중동", "count": 4}, {"name": "광안", "count": 2}, {"name": "금련산", "count": 2}, {"name": "동백", "count": 2}, {"name": "벡스코", "count": 2}, {"name": "해운대", "count": 2}, {"name": "수영", "count": 1}]}, "layers": {"subwayElevators": {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "321", "stationId": "203", "stationName": "해운대", "lineName": "2", "entranceNo": "5", "distanceMeter": 413.5}, "geometry": {"type": "Point", "coordinates": [129.15896196367152, 35.163356642202665]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "322", "stationId": "203", "stationName": "해운대", "lineName": "2", "entranceNo": "2", "distanceMeter": 418.0}, "geometry": {"type": "Point", "coordinates": [129.1589972363507, 35.16386065279551]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "327", "stationId": "202", "stationName": "중동", "lineName": "2", "entranceNo": "7", "distanceMeter": 544.4}, "geometry": {"type": "Point", "coordinates": [129.1681238508043, 35.16621176556008]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "325", "stationId": "202", "stationName": "중동", "lineName": "2", "entranceNo": "5", "distanceMeter": 571.2}, "geometry": {"type": "Point", "coordinates": [129.168400938267, 35.1663149406108]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "328", "stationId": "202", "stationName": "중동", "lineName": "2", "entranceNo": "8", "distanceMeter": 592.0}, "geometry": {"type": "Point", "coordinates": [129.16779628847968, 35.167100747262346]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "326", "stationId": "202", "stationName": "중동", "lineName": "2", "entranceNo": "4", "distanceMeter": 629.9}, "geometry": {"type": "Point", "coordinates": [129.16853953544808, 35.16698831326937]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "317", "stationId": "204", "stationName": "동백", "lineName": "2", "entranceNo": "1", "distanceMeter": 1392.2}, "geometry": {"type": "Point", "coordinates": [129.1484575389587, 35.16074992428016]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "318", "stationId": "204", "stationName": "동백", "lineName": "2", "entranceNo": "4", "distanceMeter": 1470.3}, "geometry": {"type": "Point", "coordinates": [129.147390808149, 35.1619132988281]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "310", "stationId": "205", "stationName": "벡스코", "lineName": "2", "entranceNo": "1", "distanceMeter": 2254.6}, "geometry": {"type": "Point", "coordinates": [129.13946576299097, 35.16810927447611]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "312", "stationId": "205", "stationName": "벡스코", "lineName": "2", "entranceNo": "7", "distanceMeter": 2359.6}, "geometry": {"type": "Point", "coordinates": [129.138436669232, 35.16862308318507]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "304", "stationId": "206", "stationName": "센텀시티", "lineName": "2", "entranceNo": "1", "distanceMeter": 2871.5}, "geometry": {"type": "Point", "coordinates": [129.13279950703082, 35.16918209252074]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "305", "stationId": "206", "stationName": "센텀시티", "lineName": "2", "entranceNo": "5", "distanceMeter": 2930.6}, "geometry": {"type": "Point", "coordinates": [129.13204535927312, 35.16887997254007]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "306", "stationId": "206", "stationName": "센텀시티", "lineName": "2", "entranceNo": "8", "distanceMeter": 2958.8}, "geometry": {"type": "Point", "coordinates": [129.1318117959706, 35.16918146326482]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "307", "stationId": "206", "stationName": "센텀시티", "lineName": "2", "entranceNo": "10", "distanceMeter": 3011.8}, "geometry": {"type": "Point", "coordinates": [129.13111061717896, 35.16880631306228]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "301", "stationId": "207", "stationName": "민락", "lineName": "2", "entranceNo": "2", "distanceMeter": 3713.2}, "geometry": {"type": "Point", "coordinates": [129.12287756949684, 35.166607949352695]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "303", "stationId": "207", "stationName": "민락", "lineName": "2", "entranceNo": "2", "distanceMeter": 3713.2}, "geometry": {"type": "Point", "coordinates": [129.12287756949684, 35.166607949352695]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "300", "stationId": "207", "stationName": "민락", "lineName": "2", "entranceNo": "1", "distanceMeter": 3730.5}, "geometry": {"type": "Point", "coordinates": [129.122664708228, 35.166440462691]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "302", "stationId": "207", "stationName": "민락", "lineName": "2", "entranceNo": "1", "distanceMeter": 3730.5}, "geometry": {"type": "Point", "coordinates": [129.122664708228, 35.166440462691]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "296", "stationId": "208", "stationName": "수영", "lineName": "2", "entranceNo": "1,2", "distanceMeter": 4468.2}, "geometry": {"type": "Point", "coordinates": [129.11436558742338, 35.16421563402551]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "291", "stationId": "209", "stationName": "광안", "lineName": "2", "entranceNo": "5", "distanceMeter": 4639.1}, "geometry": {"type": "Point", "coordinates": [129.11304469092207, 35.15684924862086]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "292", "stationId": "209", "stationName": "광안", "lineName": "2", "entranceNo": "6", "distanceMeter": 4658.2}, "geometry": {"type": "Point", "coordinates": [129.11281646359697, 35.156934334240916]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "287", "stationId": "210", "stationName": "금련산", "lineName": "2", "entranceNo": "3", "distanceMeter": 4967.6}, "geometry": {"type": "Point", "coordinates": [129.11121395107077, 35.15012253242714]}}, {"type": "Feature", "properties": {"source": "SUBWAY_ELEVATOR", "elevatorId": "288", "stationId": "210", "stationName": "금련산", "lineName": "2", "entranceNo": "4", "distanceMeter": 4986.9}, "geometry": {"type": "Point", "coordinates": [129.11097384221816, 35.150171775336304]}}]}}};
+    const elevatorStyle = {"color": "#16a34a", "weight": 1, "fillColor": "#22c55e", "fillOpacity": 0.92};
+    const hostWarning = document.getElementById("host-warning");
+
+    function setWarning(message) {
+      hostWarning.hidden = false;
+      hostWarning.innerHTML = message;
+    }
+
+    if (location.protocol === "file:") {
+      setWarning(`현재 <code>file://</code> 경로로 열려 있어 카카오 SDK가 차단될 수 있습니다. <a href="${payload.meta.localhostUrl}">${payload.meta.localhostUrl}</a> 로 여는 편이 안정적입니다.`);
+    }
+
+    if (!window.kakao || !window.kakao.maps) {
+      setWarning(`Kakao Maps SDK를 불러오지 못했습니다. <a href="${payload.meta.localhostUrl}">${payload.meta.localhostUrl}</a> 로 다시 열어보세요.`);
+    } else {
+      const map = new kakao.maps.Map(document.getElementById("map"), {
+        center: new kakao.maps.LatLng(payload.meta.centerLat, payload.meta.centerLon),
+        level: 5
+      });
+      const bounds = new kakao.maps.LatLngBounds();
+      const infoWindow = new kakao.maps.InfoWindow({ removable: true });
+
+      function markerImage(style) {
+        const markerSvg = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14">
+            <circle cx="7" cy="7" r="5" fill="${style.fillColor}" stroke="${style.color}" stroke-width="1"/>
+          </svg>
+        `)}`;
+        return new kakao.maps.MarkerImage(
+          markerSvg,
+          new kakao.maps.Size(14, 14),
+          { offset: new kakao.maps.Point(7, 7) }
+        );
+      }
+
+      function extendBounds(lng, lat) {
+        bounds.extend(new kakao.maps.LatLng(lat, lng));
+      }
+
+      function popupHtml(properties) {
+        return `<div class="info-window">${Object.entries(properties || {})
+          .map(([key, value]) => `<div><strong>${key}</strong><pre>${String(value || "-")}</pre></div>`)
+          .join("")}</div>`;
+      }
+
+      function openInfo(position, properties) {
+        infoWindow.setContent(popupHtml(properties));
+        infoWindow.setPosition(position);
+        infoWindow.open(map);
+      }
+
+      function openRoadviewTab(feature) {
+        const [lng, lat] = feature.geometry.coordinates;
+        const roadviewUrl = `https://map.kakao.com/link/roadview/${lat},${lng}`;
+        window.open(roadviewUrl, "_blank", "noopener,noreferrer");
+      }
+
+      function addMarkerFeature(feature) {
+        const [lng, lat] = feature.geometry.coordinates;
+        const position = new kakao.maps.LatLng(lat, lng);
+        extendBounds(lng, lat);
+        const marker = new kakao.maps.Marker({
+          map,
+          position,
+          image: markerImage(elevatorStyle)
+        });
+        kakao.maps.event.addListener(marker, "click", () => {
+          openInfo(position, {
+            ...(feature.properties || {}),
+            roadviewAction: "새 탭에서 카카오맵 로드뷰 열기"
+          });
+          openRoadviewTab(feature);
+        });
+      }
+
+      const centerPosition = new kakao.maps.LatLng(payload.meta.centerLat, payload.meta.centerLon);
+      extendBounds(payload.meta.centerLon, payload.meta.centerLat);
+      const centerMarker = new kakao.maps.Marker({
+        map,
+        position: centerPosition
+      });
+      kakao.maps.event.addListener(centerMarker, "click", () => {
+        openInfo(centerPosition, { title: "Haeundae Station center" });
+      });
+
+      new kakao.maps.Circle({
+        map,
+        center: centerPosition,
+        radius: payload.meta.radiusMeter,
+        strokeWeight: 2,
+        strokeColor: "#2563eb",
+        strokeOpacity: 0.8,
+        strokeStyle: "dash",
+        fillColor: "#93c5fd",
+        fillOpacity: 0.05
+      });
+
+      payload.layers.subwayElevators.features.forEach(addMarkerFeature);
+
+      kakao.maps.event.addListener(map, "click", () => infoWindow.close());
+      map.setBounds(bounds);
+    }
+  </script>
+</body>
+</html>

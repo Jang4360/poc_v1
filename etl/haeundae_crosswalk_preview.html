@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Haeundae Crosswalk Preview</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+    body { font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .panel {
+      position: absolute;
+      z-index: 700;
+      top: 12px;
+      left: 12px;
+      width: min(420px, calc(100vw - 24px));
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, 0.12);
+    }
+    .panel h1 {
+      margin: 0 0 8px;
+      font-size: 15px;
+    }
+    .panel p {
+      margin: 0 0 10px;
+      color: #334155;
+    }
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 6px 10px;
+      margin-top: 8px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .legend-swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 23, 42, 0.18);
+      flex: 0 0 auto;
+    }
+    .legend-line {
+      width: 16px;
+      height: 0;
+      border-top: 2px dashed #2563eb;
+      flex: 0 0 auto;
+    }
+    .legend-label {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .status {
+      font-size: 12px;
+      color: #475569;
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 8px;
+    }
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 7px 10px;
+      border: 1px solid #94a3b8;
+      background: #f8fafc;
+      color: #0f172a;
+      font: inherit;
+      cursor: pointer;
+    }
+    .button[hidden] {
+      display: none;
+    }
+    .leaflet-popup-content dl {
+      margin: 0;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 4px 8px;
+      font-size: 12px;
+    }
+    .leaflet-popup-content dt {
+      font-weight: 600;
+      color: #0f172a;
+    }
+    .leaflet-popup-content dd {
+      margin: 0;
+      color: #334155;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="panel">
+    <h1>Haeundae Crosswalk Preview</h1>
+    <p id="summary">Loading crosswalks within 5km of Haeundae Station...</p>
+    <p id="districts" class="status">Source CSV: etl/raw/Busan crosswalk location data (2025-04-23)</p>
+    <p id="status" class="status"></p>
+    <div class="actions">
+      <button id="pick-file" class="button" hidden>Choose CSV Manually</button>
+      <input id="file-input" type="file" accept=".csv,text/csv" hidden />
+    </div>
+    <div class="legend">
+      <div class="legend-item">
+        <span class="legend-swatch" style="background:#f97316"></span>
+        <span class="legend-label">Crosswalk</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-swatch" style="background:#0f172a"></span>
+        <span class="legend-label">Haeundae Station center</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-line"></span>
+        <span class="legend-label">5km search radius</span>
+      </div>
+    </div>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script>
+    const config = {
+      title: "Haeundae Crosswalk Preview",
+      centerLat: 35.1631,
+      centerLon: 129.1635,
+      radiusMeter: 5000,
+      csvPath: "./raw/\uBD80\uC0B0\uAD11\uC5ED\uC2DC \uD6A1\uB2E8\uBCF4\uB3C4 \uC704\uCE58 \uC815\uBCF4_20250423.csv"
+    };
+
+    const map = L.map("map").setView([config.centerLat, config.centerLon], 14);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+
+    const centerLayer = L.circleMarker([config.centerLat, config.centerLon], {
+      radius: 7,
+      color: "#0f172a",
+      fillColor: "#0f172a",
+      fillOpacity: 0.95,
+      weight: 1
+    }).bindPopup("<strong>Haeundae Station center</strong>").addTo(map);
+
+    const radiusLayer = L.circle([config.centerLat, config.centerLon], {
+      radius: config.radiusMeter,
+      color: "#2563eb",
+      fillColor: "#93c5fd",
+      fillOpacity: 0.08,
+      dashArray: "6 6",
+      weight: 2
+    }).addTo(map);
+
+    let pointLayer = L.layerGroup().addTo(map);
+
+    function haversineMeter(lat1, lon1, lat2, lon2) {
+      const earthRadius = 6371000;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2
+        + Math.cos(lat1 * Math.PI / 180)
+        * Math.cos(lat2 * Math.PI / 180)
+        * Math.sin(dLon / 2) ** 2;
+      return earthRadius * 2 * Math.asin(Math.sqrt(a));
+    }
+
+    function formatValue(value, suffix = "") {
+      if (value === null || value === undefined || value === "") {
+        return "-";
+      }
+      return `${value}${suffix}`;
+    }
+
+    function popupHtml(point) {
+      const rows = [
+        ["ID", point.id],
+        ["District", `${point.gu} ${point.dong}`],
+        ["Lot", point.lot],
+        ["Intersection", point.intersection],
+        ["Signal", point.signal],
+        ["Width", formatValue(point.widthMeter, "m")],
+        ["Height", formatValue(point.heightMeter, "m")],
+        ["Area", formatValue(point.areaSqm, "sqm")],
+        ["Distance", `${point.distanceMeter.toFixed(1)}m`]
+      ];
+
+      return `<dl>${rows.map(([key, value]) => `<dt>${key}</dt><dd>${String(value || "-")}</dd>`).join("")}</dl>`;
+    }
+
+    function parseRows(csvText) {
+      const parsed = Papa.parse(csvText, {
+        header: true,
+        skipEmptyLines: true
+      });
+
+      if (parsed.errors.length) {
+        throw new Error(parsed.errors[0].message);
+      }
+
+      const filtered = [];
+      let skippedNoCoordinate = 0;
+      const dongCounts = {};
+
+      for (const row of parsed.data) {
+        const lonRaw = row["\uACBD\uB3C4"];
+        const latRaw = row["\uC704\uB3C4"];
+
+        if (!lonRaw || !latRaw) {
+          skippedNoCoordinate += 1;
+          continue;
+        }
+
+        const lon = Number(lonRaw);
+        const lat = Number(latRaw);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+          skippedNoCoordinate += 1;
+          continue;
+        }
+
+        const distanceMeter = haversineMeter(config.centerLat, config.centerLon, lat, lon);
+        if (distanceMeter > config.radiusMeter) {
+          continue;
+        }
+
+        const point = {
+          id: row["\uC21C\uBC88"] || "",
+          gu: row["\uD589\uC815\uAD6C\uC5ED(\uAD6C)"] || "",
+          dong: row["\uD589\uC815\uAD6C\uC5ED(\uB3D9)"] || "",
+          lot: row["\uC9C0\uBC88"] || "",
+          intersection: row["\uAD50\uCC28\uB85C"] || "",
+          signal: row["\uC2E0\uD638\uB4F1\uC874\uC7AC\uC720\uBB34"] || "",
+          widthMeter: row["\uAC00\uB85C\uAE38\uC774"] || "",
+          heightMeter: row["\uC138\uB85C\uAE38\uC774"] || "",
+          areaSqm: row["\uBA74\uC801"] || "",
+          lon,
+          lat,
+          distanceMeter
+        };
+
+        filtered.push(point);
+        dongCounts[point.dong] = (dongCounts[point.dong] || 0) + 1;
+      }
+
+      return {
+        points: filtered,
+        skippedNoCoordinate,
+        dongCounts
+      };
+    }
+
+    function renderPoints(payload) {
+      pointLayer.clearLayers();
+
+      const layers = payload.points.map((point) => {
+        return L.circleMarker([point.lat, point.lon], {
+          radius: 4,
+          color: "#ea580c",
+          fillColor: "#f97316",
+          fillOpacity: 0.75,
+          weight: 1
+        }).bindPopup(popupHtml(point));
+      });
+
+      layers.forEach((layer) => pointLayer.addLayer(layer));
+
+      const sortedDongs = Object.entries(payload.dongCounts)
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko"))
+        .slice(0, 8)
+        .map(([dong, count]) => `${dong} ${count}`)
+        .join(", ");
+
+      document.getElementById("summary").textContent =
+        `center (${config.centerLat}, ${config.centerLon}), radius ${config.radiusMeter}m, crosswalks ${payload.points.length}, skipped(no coordinate) ${payload.skippedNoCoordinate}`;
+      document.getElementById("districts").textContent =
+        sortedDongs ? `Top dongs: ${sortedDongs}` : "No crosswalks found in the selected radius.";
+
+      const fitLayer = L.featureGroup([centerLayer, radiusLayer, pointLayer]);
+      if (fitLayer.getBounds().isValid()) {
+        map.fitBounds(fitLayer.getBounds(), { padding: [20, 20] });
+      }
+    }
+
+    function setStatus(message, isError = false) {
+      const status = document.getElementById("status");
+      status.textContent = message;
+      status.style.color = isError ? "#b91c1c" : "#475569";
+    }
+
+    async function readCsvFromResponse(response) {
+      const buffer = await response.arrayBuffer();
+
+      try {
+        return new TextDecoder("euc-kr").decode(buffer);
+      } catch (error) {
+        return new TextDecoder("utf-8").decode(buffer);
+      }
+    }
+
+    async function loadByFetch() {
+      const response = await fetch(config.csvPath);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const csvText = await readCsvFromResponse(response);
+      return parseRows(csvText);
+    }
+
+    async function loadByFile(file) {
+      const buffer = await file.arrayBuffer();
+      let csvText;
+
+      try {
+        csvText = new TextDecoder("euc-kr").decode(buffer);
+      } catch (error) {
+        csvText = new TextDecoder("utf-8").decode(buffer);
+      }
+
+      return parseRows(csvText);
+    }
+
+    async function boot() {
+      try {
+        const payload = await loadByFetch();
+        renderPoints(payload);
+        setStatus("Loaded CSV automatically from etl/raw.");
+      } catch (error) {
+        const pickButton = document.getElementById("pick-file");
+        pickButton.hidden = false;
+        setStatus("Automatic CSV load failed. If you opened this file directly in a browser, choose the CSV manually.", true);
+      }
+    }
+
+    document.getElementById("pick-file").addEventListener("click", () => {
+      document.getElementById("file-input").click();
+    });
+
+    document.getElementById("file-input").addEventListener("change", async (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) {
+        return;
+      }
+
+      try {
+        const payload = await loadByFile(file);
+        renderPoints(payload);
+        setStatus(`Loaded CSV from ${file.name}.`);
+      } catch (error) {
+        setStatus(`CSV parse failed: ${error.message}`, true);
+      }
+    });
+
+    L.control.layers({}, {
+      center: centerLayer,
+      radius: radiusLayer,
+      crosswalks: pointLayer
+    }, { collapsed: false }).addTo(map);
+
+    boot();
+  </script>
+</body>
+</html>

@@ -89,6 +89,21 @@ CREATE INDEX IF NOT EXISTS idx_segment_features_geom ON segment_features USING G
 CREATE INDEX IF NOT EXISTS idx_segment_features_source
     ON segment_features ("sourceDataset", "sourceLayer", "sourceRowNumber");
 
+CREATE TABLE IF NOT EXISTS road_segment_filter_polygons (
+    "edgeId" BIGINT PRIMARY KEY REFERENCES road_segments ("edgeId") ON DELETE CASCADE,
+    "sourceRowNumber" INTEGER NOT NULL,
+    "sourceUfid" VARCHAR(34),
+    "roadWidthMeter" NUMERIC(8, 2) NOT NULL,
+    "bufferHalfWidthMeter" NUMERIC(8, 2) NOT NULL,
+    "geom" GEOMETRY(MULTIPOLYGON, 5179) NOT NULL,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_road_segment_filter_polygons_geom
+    ON road_segment_filter_polygons USING GIST ("geom");
+CREATE INDEX IF NOT EXISTS idx_road_segment_filter_polygons_source_ufid
+    ON road_segment_filter_polygons ("sourceUfid");
+
 CREATE TABLE IF NOT EXISTS low_floor_bus_routes (
     "routeId" VARCHAR(20) PRIMARY KEY,
     "routeNo" VARCHAR(20) NOT NULL,

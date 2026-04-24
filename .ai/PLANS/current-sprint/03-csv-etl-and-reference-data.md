@@ -8,6 +8,10 @@
 
 `etl/raw/`의 CSV, 정적 대중교통 참조 정보, 그리고 새로 추가된 `drive-download-20260423T114350Z-3-001` 번들 데이터를 사용해 기존 `road_segments`, `segment_features`를 보강하고, 대중교통 및 시설 참조 테이블을 정리한다.
 
+관련 보조 계획:
+
+- `N3L_A0020000_26` 중심선과 `RVWD` 폭 속성을 이용한 보조 polygon 필터 레이어 적재 계획은 [03a-road-buffer-filter-layer.md](C:/Users/SSAFY/poc_v1/.ai/PLANS/current-sprint/03a-road-buffer-filter-layer.md)에 정리한다.
+
 ## 범위
 
 - 장소 및 시설 접근성 CSV 적재

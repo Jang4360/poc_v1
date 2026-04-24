@@ -1,14 +1,14 @@
 {
   "sprint_name": "busan-eumgil-mvp-plan",
-  "updated_at": "2026-04-23",
+  "updated_at": "2026-04-24",
   "summary": {
     "planned": 6,
     "completed": 3,
     "in_progress": 0,
     "blocked": 0,
     "progress_percentage": 50.0,
-    "quality_adjusted_progress": 45.0,
-    "confidence_score": 0.9
+    "quality_adjusted_progress": 35.0,
+    "confidence_score": 0.7
   },
   "items": [
     {
@@ -23,7 +23,7 @@
       "title": "SHP 기반 보행 네트워크 생성",
       "status": "completed",
       "stage": "Build",
-      "verification": "02-shp-network-load.md 구현 및 검증 완료: N3L_A0020000_26 SHP에서 road_nodes 229,129건, road_segments 248,458건 생성 및 PostGIS 적재, topology/post-load 검증 0건 오류, DB 기반 HTML preview 생성, full stage 통과"
+      "verification": "02-shp-network-load.md 구현 및 검증 완료: N3L_A0020000_26 SHP에서 2m junction normalization 적용 후 road_nodes 221,841건, road_segments 245,711건을 PostGIS에 적재. snapped endpoint 23,949건, split insertion 10,813건, topology/post-load 검증 0건 오류, DB 기반 HTML preview 생성"
     },
     {
       "id": "IEUM-PLAN-03",

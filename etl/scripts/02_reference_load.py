@@ -15,7 +15,7 @@ from etl.common import reference_loader
 
 def print_report(name: str, report: dict[str, object]) -> int:
     print(f"reference-load: {name} ok")
-    print(json.dumps(report, ensure_ascii=False, indent=2))
+    print(json.dumps(report, ensure_ascii=False, indent=2, default=reference_loader.json_default))
     return 0
 
 
@@ -27,6 +27,7 @@ def main() -> int:
             "diff-places",
             "dry-run",
             "load-places",
+            "load-road-segment-filter-polygons",
             "load-place-accessibility",
             "load-audio-signals",
             "load-crosswalks",
@@ -55,6 +56,11 @@ def main() -> int:
         return print_report("dry-run", reference_loader.run_all(dry_run=True))
     if args.stage == "load-places":
         return print_report("load-places", reference_loader.load_places(dry_run=args.dry_run))
+    if args.stage == "load-road-segment-filter-polygons":
+        return print_report(
+            "load-road-segment-filter-polygons",
+            reference_loader.load_road_segment_filter_polygons(dry_run=args.dry_run),
+        )
     if args.stage == "load-place-accessibility":
         return print_report("load-place-accessibility", reference_loader.load_place_accessibility(dry_run=args.dry_run))
     if args.stage == "load-audio-signals":

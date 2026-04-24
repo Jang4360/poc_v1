@@ -149,3 +149,25 @@ def test_shape_to_wkt_4326_multipart_linestring(monkeypatch: pytest.MonkeyPatch)
     shape = _MockShape(shapefile.POLYLINE, points, parts=[0, 2])
     result = reference_loader.shape_to_wkt_4326(shape)
     assert result.startswith("MULTILINESTRING(")
+
+
+def test_filter_polygon_half_width_uses_buffer_floor() -> None:
+    assert reference_loader.filter_polygon_half_width(None) == 1.0
+    assert reference_loader.filter_polygon_half_width(0.0) == 1.0
+    assert reference_loader.filter_polygon_half_width(1.0) == 1.0
+    assert reference_loader.filter_polygon_half_width(4.0) == 2.0
+
+
+def test_shape_to_wkt_5179_polyline_returns_linestring() -> None:
+    shape = _MockShape(shapefile.POLYLINE, [(10.0, 20.0), (30.0, 40.0)])
+    result = reference_loader.shape_to_wkt_5179(shape)
+    assert result == "LINESTRING(10.0000000000 20.0000000000,30.0000000000 40.0000000000)"
+
+
+def test_shape_to_wkt_5179_multipart_polyline_returns_multilinestring() -> None:
+    shape = _MockShape(shapefile.POLYLINE, [(0.0, 0.0), (1.0, 1.0), (2.0, 2.0), (3.0, 3.0)], parts=[0, 2])
+    result = reference_loader.shape_to_wkt_5179(shape)
+    assert result == (
+        "MULTILINESTRING((0.0000000000 0.0000000000,1.0000000000 1.0000000000),"
+        "(2.0000000000 2.0000000000,3.0000000000 3.0000000000))"
+    )

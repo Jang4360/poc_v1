@@ -4,6 +4,7 @@
 # Local ETL data and environment
 etl/raw/
 etl/.venv/
+.venv/
 etl/.pytest_cache/
 .env
 runtime/

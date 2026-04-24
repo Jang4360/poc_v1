@@ -13,6 +13,7 @@ import json
 import math
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -47,6 +48,10 @@ ELEVATOR_AUTO_M = 15.0
 ELEVATOR_REVIEW_M = 30.0
 CONTINUOUS_SOURCE_DATASET = "drive-download-20260423T114350Z-3-001"
 SLOPE_SOURCE_DATASET = "slope_analysis_staging.csv"
+FILTER_POLYGON_SOURCE_DATASET = "N3L_A0020000_26"
+FILTER_POLYGON_MATCH_M = 2.0
+FILTER_POLYGON_BUFFER_FLOOR_M = 1.0
+FILTER_POLYGON_OVERLAP_BUFFER_M = 0.25
 N3L_A0033320_OVERLAP_RATIO = 0.30
 N3L_A0033320_AUTO_M = 5.0
 SLOPE_OVERLAP_RATIO = 0.30
@@ -107,7 +112,20 @@ def ensure_dir(path: Path) -> None:
 
 def write_report(path: Path, report: dict[str, Any]) -> None:
     ensure_dir(path.parent)
-    path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(report, ensure_ascii=False, indent=2, default=json_default) + "\n",
+        encoding="utf-8",
+    )
+
+
+def json_default(value: Any) -> Any:
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, set):
+        return sorted(value)
+    raise TypeError(f"Object of type {value.__class__.__name__} is not JSON serializable")
 
 
 def read_csv_rows(path: Path, *, encodings: Iterable[str] = CSV_ENCODINGS) -> tuple[list[dict[str, str]], str, list[str]]:
@@ -172,6 +190,12 @@ def normalize_provider(value: str) -> str | None:
     return text or None
 
 
+def filter_polygon_half_width(width_meter: float | None) -> float:
+    if width_meter is None or width_meter <= 0:
+        return FILTER_POLYGON_BUFFER_FLOOR_M
+    return max(width_meter / 2.0, FILTER_POLYGON_BUFFER_FLOOR_M)
+
+
 def normalize_crossing_state(value: str) -> str:
     text = (value or "").strip().upper()
     if text in {"TRAFFIC_SIGNALS", "NO", "UNKNOWN"}:
@@ -211,6 +235,22 @@ def _ring_wkt(points: list[tuple[float, float]]) -> str:
     if points[0] != points[-1]:
         points = [*points, points[0]]
     return "(" + ",".join(f"{lon:.10f} {lat:.10f}" for lon, lat in points) + ")"
+
+
+def shape_to_wkt_5179(shape: shapefile.Shape) -> str:
+    part_starts = list(shape.parts) + [len(shape.points)]
+    parts = [shape.points[start:end] for start, end in zip(part_starts, part_starts[1:], strict=False)]
+    parts = [part for part in parts if len(part) >= 2]
+    if shape.shapeType in {
+        shapefile.POLYLINE,
+        shapefile.POLYLINEZ,
+        shapefile.POLYLINEM,
+    }:
+        lines = ["(" + ",".join(f"{lon:.10f} {lat:.10f}" for lon, lat in part) + ")" for part in parts]
+        if len(lines) == 1:
+            return f"LINESTRING{lines[0]}"
+        return "MULTILINESTRING(" + ",".join(lines) + ")"
+    raise ValueError(f"unsupported shape type for EPSG:5179 WKT conversion: {shape.shapeTypeName}")
 
 
 def shape_to_wkt_4326(shape: shapefile.Shape) -> str:
@@ -257,6 +297,25 @@ def ensure_reference_schema() -> None:
         CREATE INDEX IF NOT EXISTS idx_segment_features_source
             ON segment_features ("sourceDataset", "sourceLayer", "sourceRowNumber")
         """,
+        """
+        CREATE TABLE IF NOT EXISTS road_segment_filter_polygons (
+            "edgeId" BIGINT PRIMARY KEY REFERENCES road_segments ("edgeId") ON DELETE CASCADE,
+            "sourceRowNumber" INTEGER NOT NULL,
+            "sourceUfid" VARCHAR(34),
+            "roadWidthMeter" NUMERIC(8, 2) NOT NULL,
+            "bufferHalfWidthMeter" NUMERIC(8, 2) NOT NULL,
+            "geom" GEOMETRY(MULTIPOLYGON, 5179) NOT NULL,
+            "createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_road_segment_filter_polygons_geom
+            ON road_segment_filter_polygons USING GIST ("geom")
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_road_segment_filter_polygons_source_ufid
+            ON road_segment_filter_polygons ("sourceUfid")
+        """,
     ]
     with connect() as conn:
         with conn.cursor() as cur:
@@ -264,6 +323,11 @@ def ensure_reference_schema() -> None:
                 cur.execute(statement)
         conn.commit()
     _schema_ensured = True
+
+
+def table_exists(cur: Any, table_name: str) -> bool:
+    cur.execute("SELECT to_regclass(%s)", (f"public.{table_name}",))
+    return cur.fetchone()[0] is not None
 
 
 def diff_place_csvs() -> dict[str, Any]:
@@ -773,6 +837,246 @@ def _record_to_dict(fields: list[str], record: shapefile.Record) -> dict[str, st
 
 def _json_properties(properties: dict[str, Any]) -> str:
     return json.dumps(properties, ensure_ascii=False)
+
+
+def load_road_segment_filter_polygons(*, dry_run: bool = False) -> dict[str, Any]:
+    reader, encoding = open_shapefile(CENTERLINE_SOURCE)
+    fields = [field[0] for field in reader.fields[1:]]
+    stats = LoadStats(
+        details={
+            "source_dataset": FILTER_POLYGON_SOURCE_DATASET,
+            "source_file": str(CENTERLINE_SOURCE),
+            "encoding": encoding,
+            "shape_type": reader.shapeTypeName,
+            "fields": fields,
+        }
+    )
+    source_rows: list[tuple[int, str | None, float, str]] = []
+    for source_row_number, shape_record in enumerate(reader.iterShapeRecords(), start=1):
+        stats.source_rows += 1
+        props = _record_to_dict(fields, shape_record.record)
+        width_meter = parse_optional_float(props.get("RVWD"))
+        if width_meter is None or width_meter <= 0:
+            stats.skipped_rows += 1
+            continue
+        try:
+            geom_wkt_5179 = shape_to_wkt_5179(shape_record.shape)
+        except ValueError:
+            stats.skipped_rows += 1
+            continue
+        source_rows.append((source_row_number, props.get("UFID") or None, width_meter, geom_wkt_5179))
+    stats.details["candidate_rows"] = len(source_rows)
+    stats.details["road_width_meter_stats"] = {
+        "min": min((row[2] for row in source_rows), default=None),
+        "avg": round(sum(row[2] for row in source_rows) / len(source_rows), 3) if source_rows else None,
+        "max": max((row[2] for row in source_rows), default=None),
+    }
+
+    ensure_reference_schema()
+    with connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM road_segments")
+            road_segment_count = int(cur.fetchone()[0])
+            stats.details["road_segment_count"] = road_segment_count
+
+            cur.execute(
+                """
+                CREATE TEMP TABLE tmp_centerline_filter_source (
+                    "sourceRowNumber" INTEGER NOT NULL,
+                    "sourceUfid" TEXT,
+                    "roadWidthMeter" DOUBLE PRECISION NOT NULL,
+                    "geom" GEOMETRY(GEOMETRY, 5179) NOT NULL
+                ) ON COMMIT DROP
+                """
+            )
+
+            batch: list[tuple[int, str | None, float, str]] = []
+            for row in source_rows:
+                batch.append(row)
+                if len(batch) >= 2000:
+                    cur.executemany(
+                        """
+                        INSERT INTO tmp_centerline_filter_source (
+                            "sourceRowNumber", "sourceUfid", "roadWidthMeter", "geom"
+                        )
+                        VALUES (%s, %s, %s, ST_SetSRID(ST_GeomFromText(%s), 5179))
+                        """,
+                        batch,
+                    )
+                    batch.clear()
+            if batch:
+                cur.executemany(
+                    """
+                    INSERT INTO tmp_centerline_filter_source (
+                        "sourceRowNumber", "sourceUfid", "roadWidthMeter", "geom"
+                    )
+                    VALUES (%s, %s, %s, ST_SetSRID(ST_GeomFromText(%s), 5179))
+                    """,
+                    batch,
+                )
+            cur.execute('CREATE INDEX tmp_centerline_filter_source_geom ON tmp_centerline_filter_source USING GIST ("geom")')
+            cur.execute('ANALYZE tmp_centerline_filter_source')
+
+            cur.execute(
+                """
+                CREATE TEMP TABLE tmp_centerline_filter_source_match AS
+                WITH segment_geom AS (
+                    SELECT
+                        rs."edgeId",
+                        ST_Transform(rs."geom", 5179) AS geom_5179
+                    FROM road_segments rs
+                ),
+                candidates AS (
+                    SELECT
+                        rs."edgeId",
+                        src."sourceRowNumber",
+                        src."sourceUfid",
+                        src."roadWidthMeter",
+                        ST_Distance(rs.geom_5179, src."geom") AS distance_m,
+                        ST_Length(
+                            ST_Intersection(
+                                ST_Buffer(rs.geom_5179, %s, 'endcap=flat join=round'),
+                                src."geom"
+                            )
+                        ) AS overlap_m
+                    FROM segment_geom rs
+                    JOIN tmp_centerline_filter_source src
+                      ON src."geom" && ST_Expand(rs.geom_5179, %s)
+                     AND ST_DWithin(rs.geom_5179, src."geom", %s)
+                ),
+                ranked AS (
+                    SELECT
+                        *,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY "edgeId"
+                            ORDER BY overlap_m DESC, distance_m ASC, "sourceRowNumber" ASC
+                        ) AS rn
+                    FROM candidates
+                )
+                SELECT
+                    "edgeId",
+                    "sourceRowNumber",
+                    "sourceUfid",
+                    "roadWidthMeter",
+                    distance_m,
+                    overlap_m
+                FROM ranked
+                WHERE rn = 1
+                """,
+                (FILTER_POLYGON_OVERLAP_BUFFER_M, FILTER_POLYGON_MATCH_M, FILTER_POLYGON_MATCH_M),
+            )
+            cur.execute('CREATE INDEX tmp_centerline_filter_source_match_edge ON tmp_centerline_filter_source_match ("edgeId")')
+            cur.execute('CREATE INDEX tmp_centerline_filter_source_match_source ON tmp_centerline_filter_source_match ("sourceRowNumber")')
+            cur.execute("SELECT COUNT(*) FROM tmp_centerline_filter_source_match")
+            stats.matched_rows = int(cur.fetchone()[0])
+            stats.unmatched_rows = max(road_segment_count - stats.matched_rows, 0)
+            stats.loaded_rows = stats.matched_rows if dry_run else 0
+
+            cur.execute(
+                """
+                SELECT
+                    ROUND(MIN(distance_m)::numeric, 3),
+                    ROUND(AVG(distance_m)::numeric, 3),
+                    ROUND(MAX(distance_m)::numeric, 3),
+                    ROUND(MIN(overlap_m)::numeric, 3),
+                    ROUND(AVG(overlap_m)::numeric, 3),
+                    ROUND(MAX(overlap_m)::numeric, 3)
+                FROM tmp_centerline_filter_source_match
+                """
+            )
+            row = cur.fetchone()
+            stats.details["match_metric_stats"] = {
+                "distance_meter": {"min": row[0], "avg": row[1], "max": row[2]},
+                "overlap_meter": {"min": row[3], "avg": row[4], "max": row[5]},
+            }
+            cur.execute(
+                """
+                SELECT COUNT(*)
+                FROM (
+                    SELECT "sourceRowNumber"
+                    FROM tmp_centerline_filter_source_match
+                    GROUP BY "sourceRowNumber"
+                    HAVING COUNT(*) > 1
+                ) shared
+                """
+            )
+            stats.details["shared_source_row_count"] = int(cur.fetchone()[0])
+            cur.execute(
+                """
+                SELECT rs."edgeId"
+                FROM road_segments rs
+                LEFT JOIN tmp_centerline_filter_source_match m ON m."edgeId" = rs."edgeId"
+                WHERE m."edgeId" IS NULL
+                ORDER BY rs."edgeId"
+                LIMIT 20
+                """
+            )
+            stats.details["sample_unmatched_edge_ids"] = [int(row[0]) for row in cur.fetchall()]
+
+            if not dry_run:
+                cur.execute('TRUNCATE TABLE road_segment_filter_polygons')
+                cur.execute(
+                    """
+                    INSERT INTO road_segment_filter_polygons (
+                        "edgeId",
+                        "sourceRowNumber",
+                        "sourceUfid",
+                        "roadWidthMeter",
+                        "bufferHalfWidthMeter",
+                        "geom"
+                    )
+                    SELECT
+                        match."edgeId",
+                        match."sourceRowNumber",
+                        match."sourceUfid",
+                        ROUND(match."roadWidthMeter"::numeric, 2),
+                        ROUND(GREATEST(match."roadWidthMeter" / 2.0, %s)::numeric, 2),
+                        ST_Multi(
+                            ST_Buffer(
+                                ST_Transform(rs."geom", 5179),
+                                GREATEST(match."roadWidthMeter" / 2.0, %s),
+                                'endcap=flat join=round'
+                            )
+                        )::geometry(MULTIPOLYGON, 5179)
+                    FROM tmp_centerline_filter_source_match match
+                    JOIN road_segments rs ON rs."edgeId" = match."edgeId"
+                    """,
+                    (FILTER_POLYGON_BUFFER_FLOOR_M, FILTER_POLYGON_BUFFER_FLOOR_M),
+                )
+                stats.loaded_rows = cur.rowcount
+                cur.execute(
+                    """
+                    SELECT
+                        COUNT(*),
+                        COUNT(*) FILTER (WHERE NOT ST_IsValid("geom")),
+                        COUNT(*) FILTER (WHERE ST_SRID("geom") <> 5179),
+                        COUNT(*) FILTER (WHERE "roadWidthMeter" <= 0 OR "bufferHalfWidthMeter" <= 0)
+                    FROM road_segment_filter_polygons
+                    """
+                )
+                row = cur.fetchone()
+                stats.details["table_validation"] = {
+                    "row_count": int(row[0]),
+                    "invalid_geometry_rows": int(row[1]),
+                    "invalid_srid_rows": int(row[2]),
+                    "non_positive_width_rows": int(row[3]),
+                }
+            else:
+                stats.details["table_validation"] = {
+                    "row_count": stats.matched_rows,
+                    "invalid_geometry_rows": 0,
+                    "invalid_srid_rows": 0,
+                    "non_positive_width_rows": 0,
+                }
+        conn.commit()
+
+    report = stats.asdict()
+    write_report(
+        REFERENCE_REPORT_DIR
+        / ("road_segment_filter_polygons_dry_run_report.json" if dry_run else "road_segment_filter_polygons_load_report.json"),
+        report,
+    )
+    return report
 
 
 def load_continuous_width_surface(*, dry_run: bool = False) -> dict[str, Any]:
@@ -1425,6 +1729,7 @@ def run_all(*, dry_run: bool = False) -> dict[str, Any]:
     report = {
         "dry_run": dry_run,
         "places": places_result,
+        "road_segment_filter_polygons": load_road_segment_filter_polygons(dry_run=dry_run),
         "place_accessibility_features": load_place_accessibility(dry_run=dry_run),
         "audio_signals": load_audio_signals(dry_run=dry_run),
         "crosswalks": load_crosswalks(dry_run=dry_run),
@@ -1446,6 +1751,7 @@ def db_counts() -> dict[str, int]:
         "place_accessibility_features",
         "road_nodes",
         "road_segments",
+        "road_segment_filter_polygons",
         "segment_features",
         "low_floor_bus_routes",
         "subway_station_elevators",
@@ -1454,6 +1760,9 @@ def db_counts() -> dict[str, int]:
     with connect() as conn:
         with conn.cursor() as cur:
             for table in tables:
+                if not table_exists(cur, table):
+                    counts[table] = 0
+                    continue
                 cur.execute(f'SELECT COUNT(*) FROM "{table}"')
                 counts[table] = int(cur.fetchone()[0])
     return counts
@@ -1545,11 +1854,40 @@ def post_load_validate() -> dict[str, Any]:
                 }
                 for row in cur.fetchall()
             ]
+            road_segment_filter_polygon_summary: dict[str, Any] | None = None
+            if table_exists(cur, "road_segment_filter_polygons"):
+                cur.execute(
+                    """
+                    SELECT
+                        COUNT(*),
+                        COUNT(*) FILTER (WHERE NOT ST_IsValid("geom")),
+                        COUNT(*) FILTER (WHERE ST_SRID("geom") <> 5179),
+                        COUNT(*) FILTER (WHERE "roadWidthMeter" <= 0 OR "bufferHalfWidthMeter" <= 0)
+                    FROM road_segment_filter_polygons
+                    """
+                )
+                row = cur.fetchone()
+                cur.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM road_segment_filter_polygons rp
+                    LEFT JOIN road_segments rs ON rs."edgeId" = rp."edgeId"
+                    WHERE rs."edgeId" IS NULL
+                    """
+                )
+                road_segment_filter_polygon_summary = {
+                    "row_count": int(row[0]),
+                    "invalid_geometry_rows": int(row[1]),
+                    "invalid_srid_rows": int(row[2]),
+                    "non_positive_width_rows": int(row[3]),
+                    "orphan_edge_rows": int(cur.fetchone()[0]),
+                }
     report = {
         "counts": db_counts(),
         "orphan_place_accessibility_features": orphan_place_features,
         "orphan_segment_features": orphan_segment_features,
         "segment_features_missing_match_status": missing_match_status,
+        "road_segment_filter_polygons": road_segment_filter_polygon_summary,
         "sample_match_checks": sample_match_checks,
         "segment_feature_counts": segment_feature_counts,
         "road_segment_state_counts": {
@@ -1570,4 +1908,17 @@ def post_load_validate() -> dict[str, Any]:
         raise RuntimeError(f"orphan segment feature rows: {orphan_segment_features}")
     if missing_match_status:
         raise RuntimeError(f"segment feature rows missing matchStatus: {missing_match_status}")
+    if road_segment_filter_polygon_summary is not None:
+        if road_segment_filter_polygon_summary["invalid_geometry_rows"]:
+            raise RuntimeError(
+                f'road_segment_filter_polygons invalid geometries: {road_segment_filter_polygon_summary["invalid_geometry_rows"]}'
+            )
+        if road_segment_filter_polygon_summary["invalid_srid_rows"]:
+            raise RuntimeError(
+                f'road_segment_filter_polygons invalid SRID rows: {road_segment_filter_polygon_summary["invalid_srid_rows"]}'
+            )
+        if road_segment_filter_polygon_summary["orphan_edge_rows"]:
+            raise RuntimeError(
+                f'road_segment_filter_polygons orphan edges: {road_segment_filter_polygon_summary["orphan_edge_rows"]}'
+            )
     return report

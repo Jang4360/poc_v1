@@ -67,6 +67,7 @@
 - [x] [01-setup-and-repo-alignment.md](.ai/PLANS/current-sprint/01-setup-and-repo-alignment.md)
 - [x] [02-shp-network-load.md](.ai/PLANS/current-sprint/02-shp-network-load.md)
 - [~] [03-csv-etl-and-reference-data.md](.ai/PLANS/current-sprint/03-csv-etl-and-reference-data.md)
+- [ ] [03a-road-buffer-filter-layer.md](.ai/PLANS/current-sprint/03a-road-buffer-filter-layer.md)
 - [ ] [04-graphhopper-routing-profiles.md](.ai/PLANS/current-sprint/04-graphhopper-routing-profiles.md)
 - [ ] [04-graphhopper-routing-profiles_v2.md](.ai/PLANS/current-sprint/04-graphhopper-routing-profiles_v2.md)
 - [ ] [05-backend-api-and-orchestration.md](.ai/PLANS/current-sprint/05-backend-api-and-orchestration.md)
