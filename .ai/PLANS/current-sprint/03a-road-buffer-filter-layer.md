@@ -36,11 +36,11 @@
 
 ## Success Criteria
 
-- [ ] 보조 polygon 테이블이 `road_segments.edgeId`와 1:1 또는 deterministic하게 연결된다.
-- [ ] `N3L_A0020000_26`만으로 생성 가능한 polygon이 "정확한 경계"가 아니라 "buffer 기반 후보 필터"임을 계획에 명시한다.
-- [ ] 적재 테이블이 재생성 가능한 ETL 보조 레이어로 정의되고 운영 테이블과 분리된다.
-- [ ] 이후 feature ETL이 `polygon candidate filter -> edge match -> road_segments/segment_features 반영` 순서를 따르도록 계획이 정리된다.
-- [ ] 생성/검증 SQL과 실패 기준이 포함된다.
+- [x] 보조 polygon 테이블이 `road_segments.edgeId`와 1:1 또는 deterministic하게 연결된다.
+- [x] `N3L_A0020000_26`만으로 생성 가능한 polygon이 "정확한 경계"가 아니라 "buffer 기반 후보 필터"임을 계획에 명시한다.
+- [x] 적재 테이블이 재생성 가능한 ETL 보조 레이어로 정의되고 운영 테이블과 분리된다.
+- [x] 이후 feature ETL이 `polygon candidate filter -> edge match -> road_segments/segment_features 반영` 순서를 따르도록 계획이 정리된다.
+- [x] 생성/검증 SQL과 실패 기준이 포함된다.
 
 ## Table Design
 
@@ -99,6 +99,14 @@
 5. 적재 단계는 `road_segments`를 변경하지 않고 `road_segment_filter_polygons`만 `TRUNCATE/INSERT` 한다.
 6. reference ETL에서 feature 입력 시 1차 후보를 `road_segment_filter_polygons`로 축소한다.
 7. 후보 축소 후 기존 규칙대로 nearest segment 또는 overlap scoring으로 최종 `edgeId`를 정한다.
+
+## Implementation Result
+
+- 스키마 반영: `db/schema.sql`에 `road_segment_filter_polygons`와 GIST/UFID 인덱스가 추가되었다.
+- 로더 반영: `etl/common/reference_loader.py`에 `load_road_segment_filter_polygons()`가 구현되었고 `etl/scripts/02_reference_load.py --stage load-road-segment-filter-polygons`로 실행 가능하다.
+- 실제 적재 결과: `2026-04-24` 기준 `road_segment_filter_polygons 248,458건`, `road_segments 248,458건`으로 1:1 적재가 완료됐다.
+- 매칭 결과: source SHP row `248,425건`, matched edge `248,458건`, unmatched edge `0건`, shared source row `53건`이다.
+- 산출물: `runtime/etl/03-reference-load/road_segment_filter_polygons_load_report.json`, `runtime/etl/03-reference-load/post_load_validate.json`
 
 ## Reference ETL Integration Rule
 

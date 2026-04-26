@@ -66,8 +66,8 @@
 
 - [x] [01-setup-and-repo-alignment.md](.ai/PLANS/current-sprint/01-setup-and-repo-alignment.md)
 - [x] [02-shp-network-load.md](.ai/PLANS/current-sprint/02-shp-network-load.md)
-- [~] [03-csv-etl-and-reference-data.md](.ai/PLANS/current-sprint/03-csv-etl-and-reference-data.md)
-- [ ] [03a-road-buffer-filter-layer.md](.ai/PLANS/current-sprint/03a-road-buffer-filter-layer.md)
+- [x] [03-csv-etl-and-reference-data.md](.ai/PLANS/current-sprint/03-csv-etl-and-reference-data.md)
+- [x] [03a-road-buffer-filter-layer.md](.ai/PLANS/current-sprint/03a-road-buffer-filter-layer.md)
 - [ ] [04-graphhopper-routing-profiles.md](.ai/PLANS/current-sprint/04-graphhopper-routing-profiles.md)
 - [ ] [04-graphhopper-routing-profiles_v2.md](.ai/PLANS/current-sprint/04-graphhopper-routing-profiles_v2.md)
 - [ ] [05-backend-api-and-orchestration.md](.ai/PLANS/current-sprint/05-backend-api-and-orchestration.md)
@@ -102,7 +102,7 @@ Planning guard for real service: all downstream ETL, GraphHopper import, and ver
 ## Build
 
 - [x] DB 스키마와 SHP 네트워크 적재기를 구현한다.
-- [~] CSV 기반 보강 ETL을 구현한다.
+- [x] CSV 기반 보강 ETL을 구현한다.
 - [ ] GraphHopper 플러그인과 custom model을 구현한다.
 - [ ] Spring Boot API와 검증용 UI 또는 시연 흐름을 구현한다.
 

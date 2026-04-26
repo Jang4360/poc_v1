@@ -16,6 +16,7 @@ def test_render_html_includes_kakao_polygon_and_new_tab_roadview_bits() -> None:
         "summary": {
             "totalFetched": 25,
             "audioSignalCandidates": 7,
+            "audioSignalMarkers": 7,
             "audioSignalsMatched": 3,
             "filterPolygons": 10,
             "matchedPolygons": 2,
@@ -100,6 +101,8 @@ def test_render_html_includes_kakao_polygon_and_new_tab_roadview_bits() -> None:
     assert "Haeundae Audio Signal Polygon Preview" in rendered
     assert "Districts: 해운대구 5, 수영구 2" in rendered
     assert "Polygons containing audio signals" in rendered
+    assert "Audio signal marker" in rendered
+    assert "location.replace(\"http://127.0.0.1:3000/etl/haeundae_audio_signal_preview.html\")" in rendered
     assert "openRoadviewTab" in rendered
     assert "window.open(roadviewUrl, \"_blank\", \"noopener,noreferrer\")" in rendered
     assert "새 탭에서 카카오맵 로드뷰 열기" in rendered

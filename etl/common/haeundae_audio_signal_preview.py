@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import html
 import json
 import math
@@ -22,6 +23,7 @@ if load_dotenv is not None:
     load_dotenv(ROOT_DIR / ".env")
 
 ETL_DIR = ROOT_DIR / "etl"
+RAW_AUDIO_SIGNALS = ETL_DIR / "raw" / "stg_audio_signals_ready.csv"
 OUTPUT_HTML = ETL_DIR / "haeundae_audio_signal_preview.html"
 OUTPUT_GEOJSON = ETL_DIR / "haeundae_audio_signal_preview.geojson"
 KAKAO_JAVASCRIPT_KEY = os.getenv("KAKAO_JAVASCRIPT_KEY", "")
@@ -87,6 +89,29 @@ def _coerce_items(body: dict[str, Any]) -> list[dict[str, Any]]:
     return list(items)
 
 
+def _load_audio_signal_rows_from_csv(path: Path = RAW_AUDIO_SIGNALS) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+        for row in csv.DictReader(handle):
+            rows.append(
+                {
+                    "seq": row.get("sourceId", ""),
+                    "sigungu": row.get("sigungu", ""),
+                    "location": row.get("location", ""),
+                    "address": row.get("address", ""),
+                    "place": row.get("place", ""),
+                    "stat": row.get("stat", ""),
+                    "status": row.get("audioSignalState", ""),
+                    "ins_company": "",
+                    "ins_year": "",
+                    "confirm_date": row.get("confirmDate", ""),
+                    "lat": row.get("lat", ""),
+                    "lng": row.get("lng", ""),
+                }
+            )
+    return rows
+
+
 def fetch_audio_signal_rows(
     *,
     api_base_url: str | None = None,
@@ -96,6 +121,8 @@ def fetch_audio_signal_rows(
     base_url = (api_base_url or os.getenv("BUSAN_ACSTC_BCN_API_BASE_URL") or DEFAULT_API_BASE_URL).rstrip("/")
     key = service_key or os.getenv(SERVICE_KEY_ENV, "")
     if not key:
+        if RAW_AUDIO_SIGNALS.exists():
+            return _load_audio_signal_rows_from_csv()
         raise RuntimeError(f"missing service key in env: {SERVICE_KEY_ENV}")
 
     url = f"{base_url}/getAcstcBcnInfo"
@@ -162,6 +189,11 @@ def build_payload(
     radius_m: int = DEFAULT_RADIUS_M,
 ) -> dict[str, Any]:
     all_rows = fetch_audio_signal_rows()
+    data_source = (
+        os.getenv("BUSAN_ACSTC_BCN_API_BASE_URL", DEFAULT_API_BASE_URL)
+        if os.getenv(SERVICE_KEY_ENV, "")
+        else str(RAW_AUDIO_SIGNALS)
+    )
     candidate_signals: list[dict[str, Any]] = []
     skipped_no_coordinate = 0
     district_counts: dict[str, int] = {}
@@ -200,65 +232,74 @@ def build_payload(
         )
 
     matched_polygon_by_edge: dict[int, int] = {}
+    audio_signal_features = [
+        {
+            "type": "Feature",
+            "properties": {
+                **signal,
+                "matchedPolygonCount": 0,
+                "matchedEdgeIds": [],
+            },
+            "geometry": {"type": "Point", "coordinates": [signal["lng"], signal["lat"]]},
+        }
+        for signal in candidate_signals
+    ]
     matched_signal_features: list[dict[str, Any]] = []
+    polygon_features: list[dict[str, Any]] = []
+    db_error = ""
 
-    with connect() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                WITH center AS (
-                    SELECT ST_SetSRID(ST_MakePoint(%s, %s), 4326) AS geom
+    try:
+        with connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    WITH center AS (
+                        SELECT ST_SetSRID(ST_MakePoint(%s, %s), 4326) AS geom
+                    )
+                    SELECT
+                        rp."edgeId",
+                        rp."sourceRowNumber",
+                        rp."sourceUfid",
+                        rp."roadWidthMeter",
+                        rp."bufferHalfWidthMeter",
+                        ST_AsGeoJSON(ST_Transform(rp."geom", 4326))
+                    FROM road_segment_filter_polygons rp, center c
+                    WHERE ST_DWithin(ST_Transform(rp."geom", 4326)::geography, c.geom::geography, %s)
+                    ORDER BY rp."edgeId"
+                    """,
+                    (center_lon, center_lat, radius_m),
                 )
-                SELECT
-                    rp."edgeId",
-                    rp."sourceRowNumber",
-                    rp."sourceUfid",
-                    rp."roadWidthMeter",
-                    rp."bufferHalfWidthMeter",
-                    ST_AsGeoJSON(ST_Transform(rp."geom", 4326))
-                FROM road_segment_filter_polygons rp, center c
-                WHERE ST_DWithin(ST_Transform(rp."geom", 4326)::geography, c.geom::geography, %s)
-                ORDER BY rp."edgeId"
-                """,
-                (center_lon, center_lat, radius_m),
-            )
-            polygon_features = [
-                {
-                    "type": "Feature",
-                    "properties": {
-                        "edgeId": int(edge_id),
-                        "sourceRowNumber": int(source_row_number),
-                        "sourceUfid": source_ufid,
-                        "roadWidthMeter": float(road_width_meter),
-                        "bufferHalfWidthMeter": float(buffer_half_width_meter),
-                        "hasMatchedAudioSignal": False,
-                        "matchedAudioSignalCount": 0,
-                    },
-                    "geometry": _json_geometry(geometry),
-                }
-                for edge_id, source_row_number, source_ufid, road_width_meter, buffer_half_width_meter, geometry in cur.fetchall()
-            ]
-
-            for signal in candidate_signals:
-                matched_polygons = _match_audio_signal_to_polygons(cur, signal)
-                if not matched_polygons:
-                    continue
-
-                matched_edge_ids = [item["edgeId"] for item in matched_polygons]
-                for edge_id in matched_edge_ids:
-                    matched_polygon_by_edge[edge_id] = matched_polygon_by_edge.get(edge_id, 0) + 1
-
-                matched_signal_features.append(
+                polygon_features = [
                     {
                         "type": "Feature",
                         "properties": {
-                            **signal,
-                            "matchedPolygonCount": len(matched_polygons),
-                            "matchedEdgeIds": matched_edge_ids,
+                            "edgeId": int(edge_id),
+                            "sourceRowNumber": int(source_row_number),
+                            "sourceUfid": source_ufid,
+                            "roadWidthMeter": float(road_width_meter),
+                            "bufferHalfWidthMeter": float(buffer_half_width_meter),
+                            "hasMatchedAudioSignal": False,
+                            "matchedAudioSignalCount": 0,
                         },
-                        "geometry": {"type": "Point", "coordinates": [signal["lng"], signal["lat"]]},
+                        "geometry": _json_geometry(geometry),
                     }
-                )
+                    for edge_id, source_row_number, source_ufid, road_width_meter, buffer_half_width_meter, geometry in cur.fetchall()
+                ]
+
+                for signal, signal_feature in zip(candidate_signals, audio_signal_features):
+                    matched_polygons = _match_audio_signal_to_polygons(cur, signal)
+                    if not matched_polygons:
+                        continue
+
+                    matched_edge_ids = [item["edgeId"] for item in matched_polygons]
+                    for edge_id in matched_edge_ids:
+                        matched_polygon_by_edge[edge_id] = matched_polygon_by_edge.get(edge_id, 0) + 1
+
+                    signal_feature["properties"]["matchedPolygonCount"] = len(matched_polygons)
+                    signal_feature["properties"]["matchedEdgeIds"] = matched_edge_ids
+                    matched_signal_features.append(signal_feature)
+    except Exception as exc:
+        db_error = str(exc).splitlines()[0]
 
     matched_polygon_features = []
     for feature in polygon_features:
@@ -270,6 +311,12 @@ def build_payload(
             matched_polygon_features.append(feature)
 
     matched_signal_features.sort(
+        key=lambda feature: (
+            feature["properties"]["distanceMeter"],
+            feature["properties"]["seq"],
+        )
+    )
+    audio_signal_features.sort(
         key=lambda feature: (
             feature["properties"]["distanceMeter"],
             feature["properties"]["seq"],
@@ -287,6 +334,8 @@ def build_payload(
             "centerLon": center_lon,
             "radiusMeter": radius_m,
             "apiBaseUrl": os.getenv("BUSAN_ACSTC_BCN_API_BASE_URL", DEFAULT_API_BASE_URL),
+            "dataSource": data_source,
+            "dbError": db_error,
             "localhostUrl": f"http://127.0.0.1:3000/etl/{OUTPUT_HTML.name}",
             "outputHtml": str(OUTPUT_HTML),
             "outputGeojson": str(OUTPUT_GEOJSON),
@@ -294,6 +343,7 @@ def build_payload(
         "summary": {
             "totalFetched": len(all_rows),
             "audioSignalCandidates": len(candidate_signals),
+            "audioSignalMarkers": len(audio_signal_features),
             "audioSignalsMatched": len(matched_signal_features),
             "filterPolygons": len(polygon_features),
             "matchedPolygons": len(matched_polygon_features),
@@ -303,7 +353,7 @@ def build_payload(
         "layers": {
             "filterPolygons": _feature_collection(polygon_features),
             "matchedPolygons": _feature_collection(matched_polygon_features),
-            "audioSignals": _feature_collection(matched_signal_features),
+            "audioSignals": _feature_collection(audio_signal_features),
         },
     }
 
@@ -314,7 +364,8 @@ def render_html(payload: dict[str, Any]) -> str:
     summary_text = html.escape(
         f"center ({meta['centerLat']:.4f}, {meta['centerLon']:.4f}), radius {meta['radiusMeter']}m, "
         f"polygons {summary['filterPolygons']}, matched polygons {summary['matchedPolygons']}, "
-        f"audio signals {summary['audioSignalsMatched']} / candidates {summary['audioSignalCandidates']}, "
+        f"audio signal markers {summary.get('audioSignalMarkers', summary['audioSignalCandidates'])} / candidates {summary['audioSignalCandidates']}, "
+        f"matched {summary['audioSignalsMatched']}, "
         f"skipped(no coordinate) {summary['skippedNoCoordinate']}"
     )
     top_districts_text = ", ".join(
@@ -431,7 +482,9 @@ def render_html(payload: dict[str, Any]) -> str:
       <h1>{html.escape(meta['title'])}</h1>
       <p>{summary_text}</p>
       <p>Districts: {html.escape(top_districts_text)}</p>
+      <p>Data source: {html.escape(meta.get('dataSource', meta['apiBaseUrl']))}</p>
       <p>Source API: {html.escape(meta['apiBaseUrl'])}</p>
+      {f'<p>DB matching skipped: {html.escape(meta["dbError"])}</p>' if meta.get("dbError") else ""}
       <p id="host-warning" class="warning" hidden></p>
       <div class="legend">
         <div class="legend-item">
@@ -444,7 +497,7 @@ def render_html(payload: dict[str, Any]) -> str:
         </div>
         <div class="legend-item">
           <span class="legend-swatch" style="background:{AUDIO_SIGNAL_POINT_STYLE['fillColor']}"></span>
-          <span class="legend-label">Matched audio signal</span>
+          <span class="legend-label">Audio signal marker</span>
         </div>
         <div class="legend-item">
           <span class="legend-line"></span>
@@ -453,6 +506,11 @@ def render_html(payload: dict[str, Any]) -> str:
       </div>
     </div>
   </section>
+  <script>
+    if (location.protocol === "http:" && location.hostname === "127.0.0.1" && location.port && location.port !== "3000") {{
+      location.replace("{html.escape(meta['localhostUrl'])}");
+    }}
+  </script>
   <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_javascript_key}&libraries=services"></script>
   <script>
     const payload = {payload_json};

@@ -1,9 +1,10 @@
 # 📋 ERD v2 — SHP 기반 보행 네트워크
 
 > **작성일:** 2026-04-23
+> **최종 수정일:** 2026-04-25
 > **기준 문서:** `docs/erd.md` (원본 OSM 기반)
-> **변경 사유:** canonical source를 `busan.osm.pbf`에서 `N3L_A0020000_26` SHP(국토교통부 도로 중심선)로 전환함에 따라 OSM 전용 source identity 컬럼을 제거하고, 보행 네트워크의 내부 식별자를 `vertexId`와 `edgeId` 중심으로 재정의
-> **참조 계획:** `.ai/PLANS/current-sprint/02-shp-network-load.md`
+> **변경 사유:** canonical source를 `busan.osm.pbf`에서 `N3L_A0020000_26` SHP(국토교통부 도로 중심선)로 전환함에 따라 OSM 전용 source identity 컬럼을 제거하고, 보행 네트워크의 내부 식별자를 `vertexId`와 `edgeId` 중심으로 재정의. 02a side-aware graph 전환에 따라 `segmentType` 컬럼 추가
+> **참조 계획:** `.ai/PLANS/current-sprint/02-shp-network-load.md`, `.ai/PLANS/02a-segment-node-load.md`
 
 ---
 
@@ -14,6 +15,7 @@
 | `road_nodes` | `osmNodeId BIGINT` | `sourceNodeKey VARCHAR(100)` |
 | `road_segments` | `sourceWayId`, `sourceOsmFromNodeId`, `sourceOsmToNodeId`, `segmentOrdinal` | 없음. `edgeId`를 정규 간선 PK로 사용 |
 | `road_segments` UNIQUE | `(sourceWayId, sourceOsmFromNodeId, sourceOsmToNodeId, segmentOrdinal)` | 별도 source UNIQUE 없음 |
+| `road_segments` (02a) | — | `segmentType VARCHAR(30)` 추가. side-aware graph edge 분류 |
 
 그 외 모든 테이블(`users`, `bookmarks`, `favorite_routes`, `hazard_reports`, `hazard_report_images`, `places`, `place_accessibility_features`, `segment_features`, `route_logs`, `route_log_points`, `low_floor_bus_routes`, `subway_station_elevators`)은 `docs/erd.md`와 동일하다.
 
@@ -174,6 +176,7 @@ erDiagram
         ENUM stairsState
         ENUM elevatorState
         ENUM crossingState
+        VARCHAR segmentType
     }
 
     SEGMENT_FEATURES {
@@ -489,6 +492,7 @@ SHP 선형의 시작/종료점에서 파생된 anchor node만 관리한다. sour
 | 계단 상태 | stairsState | ENUM | NOT NULL | UNKNOWN |
 | 엘리베이터 상태 | elevatorState | ENUM | NOT NULL | UNKNOWN |
 | 횡단 상태 | crossingState | ENUM | NOT NULL | UNKNOWN |
+| 세그먼트 유형 | segmentType | VARCHAR(30) | NOT NULL | CENTERLINE |
 
 ### SHP 컬럼 매핑
 
@@ -502,6 +506,14 @@ SHP 선형의 시작/종료점에서 파생된 anchor node만 관리한다. sour
 - `widthState`: `ADEQUATE_150`, `ADEQUATE_120`, `NARROW`, `UNKNOWN`
 - `surfaceState` 후보값: `UNKNOWN`, `PAVED`, `BLOCK`, `UNPAVED`, `OTHER`
 - `crossingState`: `TRAFFIC_SIGNALS`, `NO`, `UNKNOWN`
+
+### segmentType 후보값
+
+- `CENTERLINE` — 기존 중심선 기반 edge (기본값)
+- `SIDE_LEFT` — 도로 좌측 인도 offset edge
+- `SIDE_RIGHT` — 도로 우측 인도 offset edge
+- `CROSSING` — 횡단보도 연결 edge
+- `ELEVATOR_CONNECTOR` — 엘리베이터 연결 edge
 
 ### 제약
 

@@ -64,7 +64,8 @@ CREATE TABLE IF NOT EXISTS road_segments (
     "surfaceState" VARCHAR(30) NOT NULL DEFAULT 'UNKNOWN',
     "stairsState" yes_no_unknown NOT NULL DEFAULT 'UNKNOWN',
     "elevatorState" yes_no_unknown NOT NULL DEFAULT 'UNKNOWN',
-    "crossingState" crossing_state NOT NULL DEFAULT 'UNKNOWN'
+    "crossingState" crossing_state NOT NULL DEFAULT 'UNKNOWN',
+    "segmentType" VARCHAR(30) NOT NULL DEFAULT 'CENTERLINE'
 );
 
 CREATE INDEX IF NOT EXISTS idx_road_segments_geom ON road_segments USING GIST ("geom");

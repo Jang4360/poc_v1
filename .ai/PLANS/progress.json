@@ -1,14 +1,14 @@
 {
   "sprint_name": "busan-eumgil-mvp-plan",
-  "updated_at": "2026-04-24",
+  "updated_at": "2026-04-26",
   "summary": {
     "planned": 6,
     "completed": 3,
     "in_progress": 0,
     "blocked": 0,
     "progress_percentage": 50.0,
-    "quality_adjusted_progress": 35.0,
-    "confidence_score": 0.7
+    "quality_adjusted_progress": 32.0,
+    "confidence_score": 0.64
   },
   "items": [
     {
@@ -30,7 +30,7 @@
       "title": "CSV 및 정적 참조 기반 보강 ETL",
       "status": "completed",
       "stage": "Build",
-      "verification": "03-csv-etl-and-reference-data.md 구현 및 검증 완료: places 13,564건, place_accessibility_features 42,368건, low_floor_bus_routes 146건, subway_station_elevators 231건, segment_features 172,823건 적재. slope_analysis_staging.csv 129,085건, N3L_A0033320 WIDTH 18,604건/SURFACE 19,858건, N3A_C0390000 STAIRS 902건, 연속수치지도 증적 우선 레이어 1,960건 적재. post-load FK/matchStatus 검증 0건 오류"
+      "verification": "03-csv-etl-and-reference-data.md 및 03a-road-buffer-filter-layer.md 구현 및 검증 완료: places 13,564건, place_accessibility_features 42,368건, low_floor_bus_routes 146건, subway_station_elevators 231건, segment_features 172,823건, road_segment_filter_polygons 248,458건 적재. slope_analysis_staging.csv 129,085건, N3L_A0033320 WIDTH 18,604건/SURFACE 19,858건, N3A_C0390000 STAIRS 902건, 연속수치지도 증적 우선 레이어 1,960건 적재. post-load FK/matchStatus/polygon 검증 0건 오류"
     },
     {
       "id": "IEUM-PLAN-04",
