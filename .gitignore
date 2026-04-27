@@ -6,6 +6,10 @@ etl/raw/
 etl/.venv/
 .venv/
 etl/.pytest_cache/
+# Generated ETL data and previews. Share large current snapshots outside Git.
+etl/*.csv
+etl/*.geojson
+etl/*.html
 .env
 runtime/
 __pycache__/

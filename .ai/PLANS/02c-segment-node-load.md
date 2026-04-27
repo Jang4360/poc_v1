@@ -261,6 +261,23 @@
   - 편집 내역 schema는 `version`, `sourceHtml`, `sourceGeojson`, `createdAt`, `edits[]`를 포함한다.
   - source `road_segments`, `road_nodes` payload는 직접 변경하지 않는다.
 
+### Step 2H. Local DB Load and DB-backed Preview
+
+- 입력:
+  - `etl/segment_02c_graph_materialized.geojson`
+  - 선택 입력: 편집 UI가 내보낸 `segment_02c_manual_edits.json`
+- 처리:
+  - 1. materialized payload의 `roadNodes`와 `roadSegments`를 검증한다.
+  - 2. 선택 편집 JSON이 있으면 `delete_node`, `delete_segment`, `add_node`, `add_segment` patch를 payload에 적용한다.
+  - 3. `road_nodes`, `road_segments`를 재적재한다.
+  - 4. DB에서 다시 조회한 결과로 `etl/segment_02c_graph_db.geojson`과 `etl/segment_02c_graph_db.html`을 생성한다.
+- 출력:
+  - `etl/segment_02c_graph_db.geojson`
+  - `etl/segment_02c_graph_db.html`
+- 검증:
+  - DB 적재 후 orphan edge, invalid geometry, invalid SRID, invalid length가 모두 0이다.
+  - DB 기반 HTML의 node/segment 건수가 DB 쿼리 결과와 일치한다.
+
 ### Step 3. Centerline Topology Nodes
 
 - 중심선 endpoint와 교차점 node만 추가한다.
@@ -320,9 +337,13 @@
 - [x] Step 2F HTML이 `segment_02c_graph_materialized.html`로 생성된다.
 - [x] Step 2F 모든 segment가 유효한 `fromNodeId`, `toNodeId`를 가진다.
 - [x] Step 2F 테스트와 repository verify가 통과한다.
-- [ ] Step 2G 편집 UI 계획이 bbox 렌더링과 manual_edits 저장 기준을 명시한다.
-- [ ] Step 2G HTML이 `segment_02c_graph_edit.html`로 생성된다.
-- [ ] Step 2G 테스트와 repository verify가 통과한다.
+- [x] Step 2G 편집 UI 계획이 bbox 렌더링과 manual_edits 저장 기준을 명시한다.
+- [x] Step 2G HTML이 `segment_02c_graph_edit.html`로 생성된다.
+- [x] Step 2G 테스트가 통과한다.
+- [x] Step 2H DB 적재 스크립트가 `road_nodes`, `road_segments`를 재적재한다.
+- [x] Step 2H DB 기반 HTML이 `segment_02c_graph_db.html`로 생성된다.
+- [x] Step 2H DB 적재 검증에서 orphan/invalid geometry/SRID/length가 0이다.
+- [!] repository verify는 Windows 환경에 `/bin/bash`가 없어 실행되지 않았다.
 
 ## Validation Commands
 
@@ -335,9 +356,54 @@
 - `.venv/bin/python etl/scripts/13_generate_segment_02c_centerline.py --variant sideline-intersection-03`
 - `.venv/bin/python etl/scripts/13_generate_segment_02c_centerline.py --variant graph-materialized`
 - `.venv/bin/python etl/scripts/13_generate_segment_02c_centerline.py --variant graph-edit`
+- `.venv/bin/python etl/scripts/14_load_segment_02c_graph_db.py --stage full`
 - `.venv/bin/python etl/scripts/13_generate_segment_02c_centerline.py --variant sideline-centerline-pruned`
 - `scripts/verify.sh`
 
 ## Handoff
 
 Step 2B 결과를 지도에서 확인한 뒤, 사용자가 중심선 접점 기반 prune이 실제 교차로 돌출 제거 문제를 해결하는지 판단한다. 다음 턴에서는 필요한 경우 중심선 topology node 또는 접점 threshold를 별도 HTML로 비교한다.
+
+## 2026-04-27 Manual Edit Handoff
+
+- Input manual edits: `C:/Users/SSAFY/Downloads/segment_02c_manual_edits.json`
+- Applied edits: 478 `delete_segment` records, 2 `delete_node` records.
+- CSV outputs regenerated from `etl/gangseo_segment_02c_graph_materialized.geojson` with manual edits applied:
+  - `etl/gangseo_road_nodes.csv`
+  - `etl/gangseo_road_segments.csv`
+  - `etl/road_nodes.csv`
+  - `etl/road_segments.csv`
+- CSV-backed edit preview regenerated for Songjeong/Sinho/Noksan/Hwajeon bbox `128.815,35.055,128.93,35.135`:
+  - `etl/noksan_sinho_songjeong_hwajeon_segment_02c_graph_edit.html`
+  - `etl/noksan_sinho_songjeong_hwajeon_segment_02c_graph_materialized.geojson`
+- Handoff to next stage: load the regenerated CSV into DB, then render DB-backed HTML to confirm the same deleted edge IDs remain absent.
+
+## 2026-04-27 Manual Edit Handoff 2
+
+- Input manual edits: `C:/Users/SSAFY/Downloads/segment_02c_manual_edits (2).json`
+- Applied cumulative edits: 1,384 `delete_segment` records, 7 `delete_node` records.
+- Additional segments removed from the current Gangseo CSV: 906.
+- CSV outputs regenerated from the existing edited `etl/gangseo_road_nodes.csv` and `etl/gangseo_road_segments.csv`:
+  - `etl/gangseo_road_nodes.csv`
+  - `etl/gangseo_road_segments.csv`
+  - `etl/road_nodes.csv`
+  - `etl/road_segments.csv`
+- CSV-backed edit preview regenerated for Songjeong/Sinho/Noksan/Hwajeon bbox `128.815,35.055,128.93,35.135`:
+  - `etl/noksan_sinho_songjeong_hwajeon_segment_02c_graph_edit.html`
+  - `etl/noksan_sinho_songjeong_hwajeon_segment_02c_graph_materialized.geojson`
+- Handoff to next stage: load the regenerated CSV into DB and render DB-backed HTML.
+
+## 2026-04-27 Manual Edit Handoff 4
+
+- Input manual edits: `C:/Users/SSAFY/Downloads/segment_02c_manual_edits (4).json`
+- Applied cumulative edits: 1,489 `delete_segment`, 75 `delete_node`, 24 `add_node`, and 263 `add_segment` records.
+- Existing `SIDE_LEFT` and `SIDE_RIGHT` segment types were normalized to `SIDE_LINE` in CSV outputs.
+- Edit UI segment choices now allow `SIDE_LINE` for red side lines and `SIDE_WALK` for blue crosswalk/sidewalk additions.
+- CSV outputs regenerated from the existing edited Gangseo CSV files:
+  - `etl/gangseo_road_nodes.csv`
+  - `etl/gangseo_road_segments.csv`
+  - `etl/road_nodes.csv`
+  - `etl/road_segments.csv`
+- CSV-backed edit preview regenerated for Songjeong/Sinho/Noksan/Hwajeon bbox `128.815,35.055,128.93,35.135`:
+  - `etl/noksan_sinho_songjeong_hwajeon_segment_02c_graph_edit.html`
+  - `etl/noksan_sinho_songjeong_hwajeon_segment_02c_graph_materialized.geojson`
