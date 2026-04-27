@@ -707,6 +707,17 @@ def apply_csv_manual_edits(
     return write_csv_outputs(patched, node_csv=node_csv, segment_csv=segment_csv)
 
 
+def apply_csv_edit_document(
+    *,
+    node_csv: Path,
+    segment_csv: Path,
+    edit_document: dict[str, Any],
+) -> dict[str, Any]:
+    payload = build_csv_payload(node_csv=node_csv, segment_csv=segment_csv)
+    patched = apply_manual_edits(payload, edit_document)
+    return write_csv_outputs(patched, node_csv=node_csv, segment_csv=segment_csv)
+
+
 def load_graph_file_to_db(
     *,
     source_geojson: Path = DEFAULT_SOURCE_GEOJSON,

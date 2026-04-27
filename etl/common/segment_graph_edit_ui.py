@@ -164,7 +164,7 @@ def render_html(payload: dict[str, Any]) -> str:
     </div>
     <div class="panel-actions">
       <button id="copy-edits" type="button">Copy JSON</button>
-      <button id="download-edits" type="button">Save JSON</button>
+      <button id="download-edits" type="button">Save JSON + CSV</button>
       <button id="undo-edit" type="button">Undo</button>
       <button id="clear-edits" type="button">Clear</button>
     </div>
@@ -519,14 +519,51 @@ def render_html(payload: dict[str, Any]) -> str:
       visibleStat.textContent = `visible segments ${{visibleSegments.length}}, nodes ${{visibleNodes.length}}, edits ${{manualEdits.length}}`;
     }}
 
-    function downloadEdits() {{
-      const blob = new Blob([JSON.stringify(editDocument(), null, 2) + "\\n"], {{ type: "application/json" }});
+    function fallbackDownloadEdits(editDoc) {{
+      const blob = new Blob([JSON.stringify(editDoc, null, 2) + "\\n"], {{ type: "application/json" }});
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
       anchor.download = "segment_02c_manual_edits.json";
       anchor.click();
       URL.revokeObjectURL(url);
+    }}
+
+    function applyEndpointCandidates() {{
+      const endpoints = [];
+      if (window.location.protocol === "http:" || window.location.protocol === "https:") {{
+        endpoints.push(`${{window.location.origin}}/api/segment-02c/apply-edits`);
+      }}
+      endpoints.push("http://127.0.0.1:3000/api/segment-02c/apply-edits");
+      return [...new Set(endpoints)];
+    }}
+
+    async function downloadEdits() {{
+      const editDoc = editDocument();
+      let lastError = null;
+      for (const endpoint of applyEndpointCandidates()) {{
+        try {{
+          showToast("applying edits to CSV...");
+          const response = await fetch(endpoint, {{
+            method: "POST",
+            headers: {{ "Content-Type": "application/json" }},
+            body: JSON.stringify(editDoc)
+          }});
+          const result = await response.json();
+          if (!response.ok || !result.ok) {{
+            throw new Error(result.error || `HTTP ${{response.status}}`);
+          }}
+          manualEdits = [];
+          persistEdits();
+          showToast(`CSV updated: ${{result.csv.segmentCount}} segments`);
+          window.setTimeout(() => window.location.reload(), 1200);
+          return;
+        }} catch (error) {{
+          lastError = error;
+        }}
+      }}
+      fallbackDownloadEdits(editDoc);
+      showToast(`CSV server unavailable; JSON downloaded${{lastError ? ": " + lastError.message : ""}}`);
     }}
 
     if (!window.kakao || !window.kakao.maps) {{

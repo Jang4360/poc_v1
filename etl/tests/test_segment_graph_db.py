@@ -148,3 +148,48 @@ def test_apply_csv_manual_edits_updates_csv_files(tmp_path: Path):
     assert "10,1,2" not in segment_csv.read_text(encoding="utf-8")
     assert "SIDE_RIGHT" not in segment_csv.read_text(encoding="utf-8")
     assert "SIDE_LINE" in segment_csv.read_text(encoding="utf-8")
+
+
+def test_apply_csv_edit_document_updates_csv_files(tmp_path: Path):
+    node_csv = tmp_path / "road_nodes.csv"
+    segment_csv = tmp_path / "road_segments.csv"
+    node_csv.write_text(
+        "\n".join(
+            [
+                "vertexId,sourceNodeKey,point",
+                "1,a,SRID=4326;POINT(128.1 35.1)",
+                "2,b,SRID=4326;POINT(128.2 35.2)",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    segment_csv.write_text(
+        "\n".join(
+            [
+                "edgeId,fromNodeId,toNodeId,geom,lengthMeter,walkAccess,avgSlopePercent,widthMeter,brailleBlockState,audioSignalState,rampState,widthState,surfaceState,stairsState,elevatorState,crossingState,segmentType",
+                '10,1,2,"SRID=4326;LINESTRING(128.1 35.1, 128.2 35.2)",5.00,UNKNOWN,,,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,SIDE_LINE',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    report = segment_graph_db.apply_csv_edit_document(
+        node_csv=node_csv,
+        segment_csv=segment_csv,
+        edit_document={
+            "edits": [
+                {
+                    "action": "add_segment",
+                    "segmentType": "SIDE_WALK",
+                    "fromNode": {"mode": "existing", "vertexId": 1},
+                    "toNode": {"mode": "existing", "vertexId": 2},
+                    "geom": {"type": "LineString", "coordinates": [[128.1, 35.1], [128.2, 35.2]]},
+                }
+            ]
+        },
+    )
+
+    assert report["segmentCount"] == 2
+    assert "SIDE_WALK" in segment_csv.read_text(encoding="utf-8")
