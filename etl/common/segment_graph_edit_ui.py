@@ -23,12 +23,18 @@ def render_html(payload: dict[str, Any]) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{html.escape(meta['title'])}</title>
   <style>
+    * {{
+      box-sizing: border-box;
+    }}
     html, body, #map {{
       width: 100%;
       height: 100%;
       margin: 0;
       font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       color: #0f172a;
+    }}
+    body {{
+      overflow: hidden;
     }}
     button, select {{
       height: 32px;
@@ -38,6 +44,8 @@ def render_html(payload: dict[str, Any]) -> str:
       padding: 0 10px;
       font: inherit;
       cursor: pointer;
+      min-width: 0;
+      white-space: nowrap;
     }}
     .toolbar {{
       position: absolute;
@@ -48,7 +56,7 @@ def render_html(payload: dict[str, Any]) -> str:
       flex-wrap: wrap;
       align-items: center;
       gap: 6px;
-      max-width: calc(100vw - 392px);
+      max-width: calc(100vw - 460px);
       padding: 8px;
       background: rgba(255, 255, 255, 0.96);
       border: 1px solid #dbe3ef;
@@ -69,13 +77,15 @@ def render_html(payload: dict[str, Any]) -> str:
       z-index: 810;
       top: 0;
       right: 0;
-      width: 360px;
+      width: clamp(420px, 28vw, 560px);
+      max-width: calc(100vw - 24px);
       height: 100%;
       background: rgba(255, 255, 255, 0.97);
       border-left: 1px solid #dbe3ef;
       box-shadow: -10px 0 28px rgba(15, 23, 42, 0.16);
       display: grid;
       grid-template-rows: auto auto 1fr auto;
+      overflow: hidden;
     }}
     .panel-header {{
       padding: 14px 14px 10px;
@@ -88,13 +98,17 @@ def render_html(payload: dict[str, Any]) -> str:
     .panel-header p {{
       margin: 0 0 4px;
       color: #475569;
+      overflow-wrap: anywhere;
     }}
     .panel-actions {{
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 6px;
       padding: 10px 14px;
       border-bottom: 1px solid #e2e8f0;
+    }}
+    .panel-actions .wide {{
+      grid-column: 1 / -1;
     }}
     .edits {{
       overflow: auto;
@@ -136,6 +150,14 @@ def render_html(payload: dict[str, Any]) -> str:
     .hidden {{
       display: none;
     }}
+    @media (max-width: 900px) {{
+      .toolbar {{
+        max-width: calc(100vw - 24px);
+      }}
+      .side-panel {{
+        width: min(100vw, 420px);
+      }}
+    }}
   </style>
 </head>
 <body>
@@ -164,9 +186,10 @@ def render_html(payload: dict[str, Any]) -> str:
     </div>
     <div class="panel-actions">
       <button id="copy-edits" type="button">Copy JSON</button>
-      <button id="download-edits" type="button">Save JSON + CSV</button>
+      <button id="save-edits" type="button">Save JSON</button>
+      <button id="update-csv" class="wide" type="button">Update CSV</button>
       <button id="undo-edit" type="button">Undo</button>
-      <button id="clear-edits" type="button">Clear</button>
+      <button id="reset-edits" type="button">Reset</button>
     </div>
     <div id="edits" class="edits"></div>
     <textarea id="edits-json" spellcheck="false" readonly></textarea>
@@ -519,7 +542,7 @@ def render_html(payload: dict[str, Any]) -> str:
       visibleStat.textContent = `visible segments ${{visibleSegments.length}}, nodes ${{visibleNodes.length}}, edits ${{manualEdits.length}}`;
     }}
 
-    function fallbackDownloadEdits(editDoc) {{
+    function saveJsonDocument(editDoc) {{
       const blob = new Blob([JSON.stringify(editDoc, null, 2) + "\\n"], {{ type: "application/json" }});
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
@@ -527,6 +550,7 @@ def render_html(payload: dict[str, Any]) -> str:
       anchor.download = "segment_02c_manual_edits.json";
       anchor.click();
       URL.revokeObjectURL(url);
+      showToast("manual_edits JSON saved");
     }}
 
     function applyEndpointCandidates() {{
@@ -538,7 +562,7 @@ def render_html(payload: dict[str, Any]) -> str:
       return [...new Set(endpoints)];
     }}
 
-    async function downloadEdits() {{
+    async function updateCsv() {{
       const editDoc = editDocument();
       let lastError = null;
       for (const endpoint of applyEndpointCandidates()) {{
@@ -562,8 +586,7 @@ def render_html(payload: dict[str, Any]) -> str:
           lastError = error;
         }}
       }}
-      fallbackDownloadEdits(editDoc);
-      showToast(`CSV server unavailable; JSON downloaded${{lastError ? ": " + lastError.message : ""}}`);
+      showToast(`CSV server unavailable; use Save JSON${{lastError ? ": " + lastError.message : ""}}`);
     }}
 
     if (!window.kakao || !window.kakao.maps) {{
@@ -647,7 +670,8 @@ def render_html(payload: dict[str, Any]) -> str:
     document.getElementById("mode-delete").addEventListener("click", () => setMode("delete"));
     document.getElementById("mode-add").addEventListener("click", () => setMode("add"));
     document.getElementById("reload-bbox").addEventListener("click", renderVisible);
-    document.getElementById("download-edits").addEventListener("click", downloadEdits);
+    document.getElementById("save-edits").addEventListener("click", () => saveJsonDocument(editDocument()));
+    document.getElementById("update-csv").addEventListener("click", updateCsv);
     document.getElementById("copy-edits").addEventListener("click", async () => {{
       await navigator.clipboard.writeText(JSON.stringify(editDocument(), null, 2));
       showToast("manual_edits JSON copied");
@@ -658,7 +682,7 @@ def render_html(payload: dict[str, Any]) -> str:
       renderVisible();
       showToast("last edit removed");
     }});
-    document.getElementById("clear-edits").addEventListener("click", () => {{
+    document.getElementById("reset-edits").addEventListener("click", () => {{
       manualEdits = [];
       persistEdits();
       renderVisible();

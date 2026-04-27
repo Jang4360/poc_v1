@@ -16,6 +16,10 @@ def test_graph_edit_ui_contains_manual_edit_controls() -> None:
     assert "add_segment" in rendered
     assert "fromNodeId" in rendered
     assert "toNodeId" in rendered
+    assert "Save JSON" in rendered
+    assert "Update CSV" in rendered
+    assert "Reset" in rendered
+    assert "Save JSON + CSV" not in rendered
     assert "segment_02c_manual_edits.json" in rendered
 
 
@@ -30,5 +34,7 @@ def test_write_graph_edit_outputs_writes_html_only(tmp_path) -> None:
     assert output_html.exists()
     assert payload["meta"]["stage"] == "02c-step2g-manual-edit-ui"
     rendered = output_html.read_text(encoding="utf-8")
-    assert "현재 bbox 새로고침" in rendered
+    assert "Reload bbox" in rendered
+    assert "updateCsv" in rendered
+    assert "saveJsonDocument" in rendered
     assert "localStorage" in rendered

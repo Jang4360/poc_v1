@@ -407,3 +407,149 @@ Step 2B 결과를 지도에서 확인한 뒤, 사용자가 중심선 접점 기�
 - CSV-backed edit preview regenerated for Songjeong/Sinho/Noksan/Hwajeon bbox `128.815,35.055,128.93,35.135`:
   - `etl/noksan_sinho_songjeong_hwajeon_segment_02c_graph_edit.html`
   - `etl/noksan_sinho_songjeong_hwajeon_segment_02c_graph_materialized.geojson`
+
+## 2026-04-27 Codex Resume State
+
+- Local server is available at `http://127.0.0.1:3000/etl/noksan_sinho_songjeong_hwajeon_segment_02c_graph_edit.html`.
+- CSV-backed edit preview was regenerated from the current local Gangseo CSV files:
+  - `etl/gangseo_road_nodes.csv`
+  - `etl/gangseo_road_segments.csv`
+  - `etl/noksan_sinho_songjeong_hwajeon_segment_02c_graph_edit.html`
+  - `etl/noksan_sinho_songjeong_hwajeon_segment_02c_graph_materialized.geojson`
+- Regenerated preview summary:
+  - nodes: 16,069
+  - segments: 13,175
+  - segment types: `SIDE_LINE` 13,175
+- Browser check confirmed the edit UI loads and exposes `SIDE_LINE` and `SIDE_WALK` segment choices.
+- Validation passed:
+  - `python -m pytest etl/tests/test_segment_graph_db.py`
+  - `scripts/verify.sh`
+- Next handoff: continue manual Delete/Add edits in the browser, save JSON, apply the JSON to `etl/gangseo_road_nodes.csv` and `etl/gangseo_road_segments.csv`, then rerender this same CSV-backed preview.
+
+## 2026-04-27 Manual Edit Handoff 5 + Gangseo Auto Candidate Slice
+
+- Input manual edits: `/Users/jangjooyoon/Downloads/segment_02c_manual_edits (1).json`
+- Applied edits from this file: 192 `delete_segment`, 15 `delete_node`, 1 `add_node`, and 53 `add_segment` records.
+- CSV outputs updated:
+  - `etl/gangseo_road_nodes.csv`: 298,758 rows
+  - `etl/gangseo_road_segments.csv`: 263,062 rows
+  - `etl/road_nodes.csv`
+  - `etl/road_segments.csv`
+- CSV-backed edit preview regenerated for bbox `128.815,35.055,128.93,35.135`:
+  - nodes: 16,108
+  - segments: 13,036
+  - segment types: `SIDE_LINE` 13,036
+- Added review-only Gangseo auto candidate workflow:
+  - `etl/common/segment_graph_auto_edit.py`
+  - `etl/scripts/16_generate_gangseo_auto_edit_candidates.py`
+  - `etl/tests/test_segment_graph_auto_edit.py`
+- Auto candidate policy:
+  - Use the current manual edit JSON as training examples.
+  - Exclude the training bbox from candidate generation.
+  - Generate `manual_edits`-compatible JSON only; do not mutate CSV before human approval.
+  - Delete candidates are short dangling `SIDE_LINE` segments outside the training bbox.
+  - Add candidates connect nearby degree-1 endpoints outside the training bbox and are emitted as `SIDE_WALK` review candidates.
+- Generated review artifacts:
+  - `runtime/etl/gangseo-auto-edit/gangseo_02c_auto_edit_training_data.json`
+  - `runtime/etl/gangseo-auto-edit/gangseo_02c_auto_edit_profile.json`
+  - `runtime/etl/gangseo-auto-edit/gangseo_02c_auto_manual_edit_candidates.json`
+- Generated candidate summary:
+  - `delete_segment`: 500
+  - `add_segment`: 300
+  - total: 800
+  - thresholds: `danglingDeleteMaxMeter` 62.15, `gapAddMinMeter` 4.37, `gapAddMaxMeter` 71.15
+- Validation passed:
+  - `python -m pytest etl/tests/test_segment_graph_auto_edit.py etl/tests/test_segment_graph_db.py`
+
+## 2026-04-27 Gangseo Auto Candidate Review UI
+
+- Added map-based candidate review UI:
+  - `etl/common/segment_graph_candidate_review_ui.py`
+  - `runtime/etl/gangseo-auto-edit/gangseo_02c_auto_candidate_review.html`
+- Candidate JSON schema now includes per-edit review fields:
+  - `reviewId`
+  - `review.approved`
+  - `review.status`
+  - `review.reviewedAt`
+- Review UI behavior:
+  - Existing CSV context segments are embedded around candidate locations and rendered behind candidates.
+  - The map now renders the selected candidate only, plus nearby existing CSV context, to avoid dense candidate overlap during review.
+  - Muted red/blue overlays are existing `SIDE_LINE` / `SIDE_WALK` context.
+  - Strong red overlays are `delete_segment` candidates.
+  - Strong blue overlays are `add_segment` candidates.
+  - Candidate list checkboxes mark candidates as review-passed.
+  - Candidate filters include review state and action type (`All Actions`, `Delete`, `Add`).
+  - The side panel shows approved-only JSON for the currently checked candidates.
+  - `Download Approved` exports a manual-edits-compatible JSON containing only checked candidates.
+- Candidate generation correction:
+  - Add candidates now default to the learned manual-add segment type instead of forcing `SIDE_WALK`.
+  - Current training input had 53 `add_segment` examples, all `SIDE_LINE`.
+  - Current review artifact contains 300 `add_segment` candidates as `SIDE_LINE`.
+  - Add generation now requires mutual-nearest degree-1 endpoints and prevents reusing the same endpoint in multiple add candidates.
+  - Current embedded CSV context contains 15,913 segments and 21,205 nodes.
+- Server-backed save behavior:
+  - `etl/scripts/15_serve_segment_02c_editor.py` now supports `POST /api/gangseo-auto-edit/save-review`.
+  - `Save Review JSON` writes checked state back to `runtime/etl/gangseo-auto-edit/gangseo_02c_auto_manual_edit_candidates.json`.
+  - The same save also writes approved-only edits to `runtime/etl/gangseo-auto-edit/gangseo_02c_approved_manual_edits.json`.
+  - CSV is still not mutated by review save; final CSV mutation requires applying the approved-only JSON through `apply-csv-edits`.
+- Local review URL:
+  - `http://127.0.0.1:3000/runtime/etl/gangseo-auto-edit/gangseo_02c_auto_candidate_review.html`
+
+## 2026-04-28 Direct CSV Edit Recovery
+
+- Problem: a manual review/edit pass updated `etl/gangseo_road_nodes.csv` and `etl/gangseo_road_segments.csv` directly through CSV save, without leaving a downloaded manual-edits JSON.
+- Recovery baseline:
+  - Copied `/Users/jangjooyoon/Downloads/gangseo_road_nodes.csv`
+  - Copied `/Users/jangjooyoon/Downloads/gangseo_road_segments.csv`
+  - Reapplied `/Users/jangjooyoon/Downloads/segment_02c_manual_edits (1).json` to reconstruct the pre-direct-edit baseline.
+- Reconstructed baseline counts:
+  - nodes: 298,758
+  - segments: 263,062
+- Current CSV counts:
+  - nodes: 298,588
+  - segments: 262,492
+- Recovered manual-edits JSON:
+  - `runtime/etl/recover-manual-edits/recovered_direct_csv_edits_20260428.json`
+- Recovered edit counts:
+  - `delete_segment`: 581
+  - `delete_node`: 180
+  - `add_node`: 10
+  - `add_segment`: 11
+- Verification:
+  - Applied recovered JSON to the reconstructed baseline copies under `runtime/etl/recover-manual-edits/verify_*.csv`.
+  - Resulting `verify_nodes.csv` and `verify_segments.csv` match current `etl/gangseo_road_nodes.csv` and `etl/gangseo_road_segments.csv` by SHA-256 hash.
+- Caveat:
+  - This JSON is reliable as learning/review data and reproduces the current CSV exactly from the reconstructed baseline.
+  - Added entity IDs should still be treated as replay artifacts, because future `apply-csv-edits` runs allocate add IDs from the target CSV state.
+
+## 2026-04-28 CSV Editor Button Contract
+
+- Updated `etl/common/segment_graph_edit_ui.py` so the side panel action buttons no longer combine JSON save and CSV mutation.
+- Current button contract:
+  - `Copy JSON`: copy pending `manual_edits` JSON to clipboard.
+  - `Save JSON`: download pending `manual_edits` JSON only; CSV is not touched.
+  - `Update CSV`: POST pending edits to `/api/segment-02c/apply-edits`, update Gangseo CSV files, clear pending edits, and reload.
+  - `Undo`: remove the latest pending edit from browser local state.
+  - `Reset`: clear all pending browser-local edits; CSV is not touched.
+- Layout fix:
+  - Side panel width now uses a responsive clamp and wraps long source paths so controls and text do not clip at the right edge.
+  - Panel action buttons use a stable two-column grid with `Update CSV` spanning both columns.
+- Rerendered CSV editor:
+  - `etl/noksan_sinho_songjeong_hwajeon_segment_02c_graph_edit.html`
+  - `etl/noksan_sinho_songjeong_hwajeon_segment_02c_graph_materialized.geojson`
+- Browser check confirmed the updated buttons are visible in the generated HTML.
+
+## 2026-04-28 Auto Candidate Flow Review Hardening
+
+- Reviewed the Gangseo auto edit flow against the intended safety contract:
+  - Manual editor produces `manual_edits` JSON as learning data.
+  - Auto generation writes review-only candidates under `runtime/etl/gangseo-auto-edit/`.
+  - Review UI writes checked candidates to approved-only JSON.
+  - CSV mutation must use only the approved-only JSON.
+- Hardening changes:
+  - `/api/segment-02c/apply-edits` now rejects auto candidate documents marked `doNotApplyWithoutHumanApproval` unless `meta.approvedOnly` is true.
+  - Candidate generation excludes any candidate geometry whose bbox intersects the training bbox, including lines that cross the bbox with endpoints outside it.
+  - `add_segment` candidates now require mutual nearest endpoints and directional alignment, so endpoints on the same dangling direction are not bridged.
+  - Candidate review HTML handles empty candidate sets without JavaScript errors.
+- Validation:
+  - `python -m pytest etl/tests/test_segment_graph_auto_edit.py etl/tests/test_segment_graph_edit_ui.py`
