@@ -1,0 +1,104 @@
+{
+  "appliedAt": "2026-04-28T02:46:11.787803",
+  "inputPlacesBefore": 3457,
+  "removedPlaces": 25,
+  "placesAfter": 3432,
+  "removedByReasonCode": {
+    "STATUS_NOT_KEEP": 11,
+    "MANUAL_REVIEW": 14
+  },
+  "removedByDbCategory": {
+    "ACCOMMODATION": 1,
+    "TOILET": 22,
+    "PUBLIC_OFFICE": 1,
+    "TOURIST_SPOT": 1
+  },
+  "removedByUiCategory": {
+    "숙박": 1,
+    "공중화장실": 21,
+    "공공기관": 1,
+    "시설 내 화장실": 1,
+    "관광지": 1
+  },
+  "remainingByDbCategory": {
+    "TOURIST_SPOT": 136,
+    "ETC": 82,
+    "RESTAURANT": 625,
+    "ACCOMMODATION": 226,
+    "PUBLIC_OFFICE": 258,
+    "HEALTHCARE": 275,
+    "WELFARE": 263,
+    "TOILET": 1376,
+    "CHARGING_STATION": 191
+  },
+  "files": {
+    "candidates": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\reports\\facility_validation\\facility_priority_manual_remove_candidates.csv",
+    "removedApplied": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\reports\\facility_validation\\facility_priority_manual_removed_applied.csv",
+    "adoptedPlacesWithAccessibility": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\adopted\\adopted_places_with_accessibility.csv",
+    "facilitiesMapJs": "C:\\Users\\SSAFY\\Desktop\\poc\\assets\\data\\facilities-data.js",
+    "manualReviewSeedJs": "C:\\Users\\SSAFY\\Desktop\\poc\\assets\\data\\manual-review-seed-data.js"
+  },
+  "adoptedAccessibilityRowsAfter": 7994,
+  "erdPlacesAfter": 3432,
+  "erdAccessibilityRowsAfter": 5337,
+  "mapFeaturesAfter": 3432,
+  "manualReviewSeedRemoved": 25,
+  "accessibilitySummary": {
+    "totalRows": 5337,
+    "totalPlaces": 2507,
+    "items": [
+      {
+        "featureType": "accessibleToilet",
+        "label": "전용 화장실",
+        "count": 1616
+      },
+      {
+        "featureType": "stepFree",
+        "label": "단차 없음",
+        "count": 1527
+      },
+      {
+        "featureType": "ramp",
+        "label": "경사로",
+        "count": 1468
+      },
+      {
+        "featureType": "elevator",
+        "label": "엘리베이터",
+        "count": 726
+      }
+    ],
+    "availableFeatureTypes": [
+      {
+        "featureType": "ramp",
+        "label": "경사로",
+        "count": 1468
+      },
+      {
+        "featureType": "autoDoor",
+        "label": "자동문",
+        "count": 0
+      },
+      {
+        "featureType": "elevator",
+        "label": "엘리베이터",
+        "count": 726
+      },
+      {
+        "featureType": "accessibleToilet",
+        "label": "전용 화장실",
+        "count": 1616
+      },
+      {
+        "featureType": "chargingStation",
+        "label": "전동보장구 충전",
+        "count": 0
+      },
+      {
+        "featureType": "stepFree",
+        "label": "단차 없음",
+        "count": 1527
+      }
+    ]
+  }
+}

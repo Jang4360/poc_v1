@@ -8,6 +8,7 @@ import sys
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
@@ -15,9 +16,10 @@ if str(ROOT_DIR) not in sys.path:
 
 from etl.common import segment_graph_auto_edit, segment_graph_db
 
-DEFAULT_BBOX = (128.815, 35.055, 128.93, 35.135)
-DEFAULT_NODE_CSV = segment_graph_db.ETL_DIR / "gangseo_road_nodes.csv"
-DEFAULT_SEGMENT_CSV = segment_graph_db.ETL_DIR / "gangseo_road_segments.csv"
+DEFAULT_DONG_ID = segment_graph_db.DEFAULT_GANGSEO_DONG_ID
+DEFAULT_BBOX = segment_graph_db.area_bbox_tuple(segment_graph_db.gangseo_dong_area(DEFAULT_DONG_ID))
+DEFAULT_NODE_CSV = segment_graph_db.ETL_DIR / "gangseo_road_nodes_v5.csv"
+DEFAULT_SEGMENT_CSV = segment_graph_db.ETL_DIR / "gangseo_road_segments_v5.csv"
 ALIAS_NODE_CSV = segment_graph_db.ETL_DIR / "road_nodes.csv"
 ALIAS_SEGMENT_CSV = segment_graph_db.ETL_DIR / "road_segments.csv"
 DEFAULT_CANDIDATE_JSON = segment_graph_auto_edit.DEFAULT_OUTPUT_DIR / "gangseo_02c_auto_manual_edit_candidates.json"
@@ -31,6 +33,37 @@ def parse_bbox(value: str | None) -> tuple[float, float, float, float]:
     if len(values) != 4:
         raise ValueError("--bbox must be minLon,minLat,maxLon,maxLat")
     return values
+
+
+def bbox_for_dong(dong_id_or_name: str | None) -> tuple[float, float, float, float]:
+    return segment_graph_db.area_bbox_tuple(segment_graph_db.gangseo_dong_area(dong_id_or_name))
+
+
+def build_dong_payload(
+    *,
+    dong_id_or_name: str | None,
+    node_csv: Path,
+    segment_csv: Path,
+    output_html: Path,
+    output_geojson: Path,
+) -> dict[str, Any]:
+    area = segment_graph_db.gangseo_dong_area(dong_id_or_name)
+    payload = segment_graph_db.build_csv_payload(
+        node_csv=node_csv,
+        segment_csv=segment_csv,
+        output_html=output_html,
+        output_geojson=output_geojson,
+        bbox=segment_graph_db.area_bbox_tuple(area),
+    )
+    payload["meta"].update(
+        {
+            "title": f"강서구 {area['name']} CSV-backed Graph Manual Edit UI",
+            "districtGu": "강서구",
+            "dongId": area["id"],
+            "districtDong": area["name"],
+        }
+    )
+    return payload
 
 
 def apply_and_render(
@@ -54,12 +87,16 @@ def apply_and_render(
         shutil.copyfile(node_csv, ALIAS_NODE_CSV)
     if segment_csv.resolve() != ALIAS_SEGMENT_CSV.resolve():
         shutil.copyfile(segment_csv, ALIAS_SEGMENT_CSV)
+    dong_id = str(edit_document.get("dongId") or edit_document.get("districtDong") or DEFAULT_DONG_ID)
     payload = segment_graph_db.write_csv_edit_outputs(
         node_csv=node_csv,
         segment_csv=segment_csv,
         output_html=output_html,
         output_geojson=output_geojson,
-        bbox=bbox,
+        bbox=bbox_for_dong(dong_id) if dong_id else bbox,
+        lazy_payload_endpoint="/api/segment-02c/payload",
+        dong_areas=segment_graph_db.GANGSEO_DONG_AREAS,
+        default_dong_id=segment_graph_db.gangseo_dong_area(dong_id)["id"],
     )
     return {
         "csv": csv_report,
@@ -118,6 +155,39 @@ class SegmentEditorHandler(SimpleHTTPRequestHandler):
         self.send_response(204)
         self.end_headers()
 
+    def do_GET(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path != "/api/segment-02c/payload":
+            super().do_GET()
+            return
+        try:
+            dong = parse_qs(parsed.query).get("dong", [DEFAULT_DONG_ID])[0]
+            payload = build_dong_payload(
+                dong_id_or_name=dong,
+                node_csv=self.server.node_csv,  # type: ignore[attr-defined]
+                segment_csv=self.server.segment_csv,  # type: ignore[attr-defined]
+                output_html=self.server.output_html,  # type: ignore[attr-defined]
+                output_geojson=self.server.output_geojson,  # type: ignore[attr-defined]
+            )
+            body = {
+                "ok": True,
+                "payload": payload,
+                "areas": segment_graph_db.GANGSEO_DONG_AREAS,
+            }
+            response = json.dumps(body, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(response)))
+            self.end_headers()
+            self.wfile.write(response)
+        except Exception as exc:
+            response = json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False).encode("utf-8")
+            self.send_response(500)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(response)))
+            self.end_headers()
+            self.wfile.write(response)
+
     def do_POST(self) -> None:
         path = self.path.split("?", 1)[0]
         if path not in {"/api/segment-02c/apply-edits", "/api/gangseo-auto-edit/save-review"}:
@@ -136,7 +206,7 @@ class SegmentEditorHandler(SimpleHTTPRequestHandler):
                     segment_csv=self.server.segment_csv,  # type: ignore[attr-defined]
                     output_html=self.server.output_html,  # type: ignore[attr-defined]
                     output_geojson=self.server.output_geojson,  # type: ignore[attr-defined]
-                    bbox=self.server.bbox,  # type: ignore[attr-defined]
+                    bbox=bbox_for_dong(request_document.get("dongId") or request_document.get("districtDong")),
                 )
             else:
                 report = {

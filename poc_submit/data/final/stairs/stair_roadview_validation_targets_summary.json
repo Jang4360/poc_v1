@@ -1,0 +1,36 @@
+{
+  "sourceFiles": [
+    "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_second_pass_manual_review.csv",
+    "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_second_pass_likely_adopt.csv"
+  ],
+  "output": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_roadview_validation_targets.csv",
+  "total": 981,
+  "targetGroupCounts": {
+    "MANUAL_REVIEW": 742,
+    "P4_LIKELY_ADOPT": 239
+  },
+  "priorityCounts": {
+    "P3": 382,
+    "P4": 571,
+    "P1": 17,
+    "P2": 11
+  },
+  "districtCounts": {
+    "강서구": 153,
+    "금정구": 52,
+    "기장군": 145,
+    "남구": 22,
+    "동구": 34,
+    "동래구": 32,
+    "부산진구": 58,
+    "북구": 61,
+    "사상구": 140,
+    "사하구": 37,
+    "서구": 25,
+    "수영구": 8,
+    "연제구": 28,
+    "영도구": 36,
+    "중구": 67,
+    "해운대구": 83
+  }
+}

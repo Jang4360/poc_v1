@@ -1,0 +1,91 @@
+{
+  "appliedAt": "2026-04-28T02:46:20.573657",
+  "renamedPlaces": 978,
+  "placesAfter": 3432,
+  "renamedByDbCategory": {
+    "TOURIST_SPOT": 32,
+    "RESTAURANT": 228,
+    "ACCOMMODATION": 85,
+    "PUBLIC_OFFICE": 64,
+    "HEALTHCARE": 58,
+    "TOILET": 411,
+    "WELFARE": 70,
+    "CHARGING_STATION": 30
+  },
+  "renamedByUiCategory": {
+    "관광지": 32,
+    "음식·카페": 228,
+    "숙박": 85,
+    "공공기관": 64,
+    "의료·보건": 58,
+    "공중화장실": 126,
+    "복지·돌봄": 70,
+    "시설 내 화장실": 285,
+    "전동보장구 충전소": 30
+  },
+  "accessibilityRowsAfter": 5337,
+  "accessibilitySummary": {
+    "totalRows": 5337,
+    "totalPlaces": 2507,
+    "items": [
+      {
+        "featureType": "accessibleToilet",
+        "label": "전용 화장실",
+        "count": 1616
+      },
+      {
+        "featureType": "stepFree",
+        "label": "단차 없음",
+        "count": 1527
+      },
+      {
+        "featureType": "ramp",
+        "label": "경사로",
+        "count": 1468
+      },
+      {
+        "featureType": "elevator",
+        "label": "엘리베이터",
+        "count": 726
+      }
+    ],
+    "availableFeatureTypes": [
+      {
+        "featureType": "ramp",
+        "label": "경사로",
+        "count": 1468
+      },
+      {
+        "featureType": "autoDoor",
+        "label": "자동문",
+        "count": 0
+      },
+      {
+        "featureType": "elevator",
+        "label": "엘리베이터",
+        "count": 726
+      },
+      {
+        "featureType": "accessibleToilet",
+        "label": "전용 화장실",
+        "count": 1616
+      },
+      {
+        "featureType": "chargingStation",
+        "label": "전동보장구 충전",
+        "count": 0
+      },
+      {
+        "featureType": "stepFree",
+        "label": "단차 없음",
+        "count": 1527
+      }
+    ]
+  },
+  "files": {
+    "applied": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\reports\\facility_validation\\facility_kakao_rename_review_applied.csv",
+    "adoptedPlacesWithAccessibility": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\adopted\\adopted_places_with_accessibility.csv",
+    "facilitiesMapJs": "C:\\Users\\SSAFY\\Desktop\\poc\\assets\\data\\facilities-data.js",
+    "manualReviewSeedJs": "C:\\Users\\SSAFY\\Desktop\\poc\\assets\\data\\manual-review-seed-data.js"
+  }
+}

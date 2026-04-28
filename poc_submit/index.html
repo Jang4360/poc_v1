@@ -1,0 +1,3269 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>부산 보행약자 지도 PoC</title>
+  <link rel="icon" href="data:," />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <style>
+    :root {
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #d7dce5;
+      --surface: #f5f7fb;
+      --accent: #e8590c;
+      --accent-dark: #b73505;
+      --accent-soft: #fff2e8;
+      --crosswalk: #0f8b8d;
+      --crosswalk-dark: #07595b;
+      --crosswalk-soft: #e6f7f7;
+      --facility: #2563eb;
+      --facility-dark: #1d4ed8;
+      --facility-soft: #eff6ff;
+      --road: #dc2626;
+      --road-soft: #fef08a;
+      --review-p1: #e11d48;
+      --review-p2: #f97316;
+      --teal: #127c74;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      overflow: hidden;
+      color: var(--ink);
+      background: var(--surface);
+      font-family: "Segoe UI", "Apple SD Gothic Neo", sans-serif;
+    }
+
+    button,
+    select {
+      font: inherit;
+    }
+
+    #map {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      background: #dbe6e4;
+    }
+
+    .app-panel {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      z-index: 500;
+      width: min(360px, calc(100vw - 36px));
+      max-height: calc(100vh - 36px);
+      overflow: auto;
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid rgba(23, 32, 51, 0.12);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: 0 16px 42px rgba(23, 32, 51, 0.16);
+      backdrop-filter: blur(10px);
+    }
+
+    .map-legend-panel {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 500;
+      width: min(380px, calc(100vw - 414px));
+      min-width: 330px;
+      max-height: calc(100vh - 36px);
+      overflow: auto;
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid rgba(23, 32, 51, 0.12);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: 0 16px 42px rgba(23, 32, 51, 0.16);
+      backdrop-filter: blur(10px);
+    }
+
+    .legend-panel-header {
+      display: grid;
+      gap: 4px;
+    }
+
+    .legend-panel-title {
+      margin: 0;
+      color: var(--ink);
+      font-size: 15px;
+      font-weight: 850;
+      line-height: 1.25;
+    }
+
+    .legend-panel-subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .legend-section {
+      display: grid;
+      gap: 9px;
+      padding: 12px;
+      border: 1px solid rgba(15, 23, 42, 0.1);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.78);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    }
+
+    .legend-section-title {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .legend-section-title small {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .layer-legend-list,
+    .priority-legend-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .layer-legend-row,
+    .priority-legend-row {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 9px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .legend-text {
+      display: grid;
+      gap: 1px;
+    }
+
+    .legend-text strong {
+      color: #334155;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .legend-text span {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .priority-description {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .facility-legend-categories {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .facility-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 0 8px;
+      border: 1px solid #d9e5ff;
+      border-radius: 999px;
+      background: var(--facility-soft);
+      color: var(--facility-dark);
+      font-size: 11px;
+      font-weight: 750;
+      white-space: nowrap;
+    }
+
+    .facility-note {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .panel-header {
+      display: grid;
+      gap: 4px;
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 750;
+      line-height: 1.25;
+    }
+
+    .panel-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: #eef3f7;
+      color: #405060;
+      white-space: nowrap;
+    }
+
+    .pill.accent {
+      background: var(--accent-soft);
+      color: var(--accent-dark);
+      font-weight: 700;
+    }
+
+    .pill.review {
+      background: #ffe4e6;
+      color: #be123c;
+      font-weight: 750;
+    }
+
+    .pill.manual-review {
+      background: #dcfce7;
+      color: #166534;
+      font-weight: 750;
+    }
+
+    .pill.road {
+      background: #fef3c7;
+      color: #92400e;
+      font-weight: 750;
+    }
+
+    .pill.is-off {
+      background: #f1f5f9;
+      color: #94a3b8;
+      font-weight: 650;
+    }
+
+    .control-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
+
+    .view-status {
+      display: grid;
+      gap: 3px;
+      padding: 10px;
+      border: 1px solid rgba(18, 124, 116, 0.18);
+      border-radius: 10px;
+      background: #f0fdfa;
+      color: #115e59;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .view-status strong {
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .view-status span {
+      color: #0f766e;
+    }
+
+    .control-section {
+      display: grid;
+      gap: 9px;
+      padding: 11px;
+      border: 1px solid rgba(15, 23, 42, 0.1);
+      border-radius: 12px;
+      background: rgba(248, 250, 252, 0.88);
+    }
+
+    .control-section-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .control-section-title small {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 750;
+    }
+
+    .toggle-copy {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .toggle-copy strong {
+      color: #334155;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .toggle-copy small {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .layer-policy-list {
+      display: grid;
+      gap: 7px;
+    }
+
+    .layer-policy-item {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px;
+      align-items: start;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .layer-policy-item strong {
+      color: #334155;
+      font-weight: 850;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      margin-top: 4px;
+      border-radius: 50%;
+      background: var(--teal);
+      box-shadow: 0 0 0 3px rgba(18, 124, 116, 0.12);
+    }
+
+    .status-dot.off {
+      background: #94a3b8;
+      box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.16);
+    }
+
+    .select {
+      width: 100%;
+      min-height: 38px;
+      padding: 0 34px 0 11px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--ink);
+      background: var(--panel);
+    }
+
+    .select:disabled {
+      opacity: 0.56;
+      cursor: not-allowed;
+    }
+
+    .button {
+      min-height: 38px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--ink);
+      background: var(--panel);
+      cursor: pointer;
+    }
+
+    .button:hover {
+      border-color: #aeb8c8;
+      background: #f9fafc;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 2px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .filter-row {
+      display: grid;
+      gap: 6px;
+      padding: 2px 0 4px;
+    }
+
+    .filter-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .review-panel {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid rgba(225, 29, 72, 0.18);
+      border-radius: 8px;
+      background: #fff7f7;
+    }
+
+    .review-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: #9f1239;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .priority-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .priority-option {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 28px;
+      padding: 0 8px;
+      border: 1px solid #e2e8f0;
+      border-radius: 999px;
+      background: #fff;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .priority-option input {
+      width: 14px;
+      height: 14px;
+      margin: 0;
+    }
+
+    .priority-option:has(input:checked) {
+      border-color: currentColor;
+      box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.08);
+    }
+
+    .priority-option.p1 {
+      color: var(--review-p1);
+    }
+
+    .priority-option.p2 {
+      color: var(--review-p2);
+    }
+
+    .priority-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-flex;
+      width: 44px;
+      height: 24px;
+      flex: 0 0 auto;
+    }
+
+    .switch input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .switch span {
+      width: 100%;
+      height: 100%;
+      border-radius: 999px;
+      background: #c7ced8;
+      cursor: pointer;
+      transition: background 160ms ease;
+    }
+
+    .switch span::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 2px 6px rgba(23, 32, 51, 0.25);
+      transition: transform 160ms ease;
+    }
+
+    .switch input:checked + span {
+      background: var(--teal);
+    }
+
+    .switch input:checked + span::after {
+      transform: translateX(20px);
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px 10px;
+      align-items: center;
+      padding-top: 2px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .dot-sample {
+      width: 12px;
+      height: 12px;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 1px rgba(232, 89, 12, 0.32);
+    }
+
+    .dot-sample.crosswalk {
+      background: var(--crosswalk);
+      box-shadow: 0 0 0 1px rgba(15, 139, 141, 0.34);
+    }
+
+    .dot-sample.facility {
+      background: var(--facility);
+      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.34);
+    }
+
+    .dot-sample.road {
+      width: 20px;
+      height: 12px;
+      border: 2px solid var(--road);
+      border-radius: 999px;
+      background: var(--road-soft);
+      box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.14);
+    }
+
+    .road-layer-legend {
+      display: grid;
+      gap: 10px;
+    }
+
+    .road-legend-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .road-legend-note {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .road-legend-section {
+      display: grid;
+      gap: 6px;
+    }
+
+    .road-legend-section-title {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+    }
+
+    .road-slope-scale {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .road-slope-chip {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.2;
+    }
+
+    .road-slope-chip::before {
+      content: "";
+      display: block;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--slope-color);
+      box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.08);
+    }
+
+    .road-risk-scale {
+      display: grid;
+      gap: 6px;
+    }
+
+    .road-risk-chip {
+      display: grid;
+      grid-template-columns: 64px 1fr;
+      gap: 8px;
+      align-items: start;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.35;
+    }
+
+    .road-risk-chip strong {
+      display: inline-flex;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 3px 7px;
+      color: white;
+      font-size: 10px;
+      background: var(--risk-color);
+      box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.08);
+    }
+
+    .risk-badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 2px 8px;
+      color: white;
+      font-size: 11px;
+      font-weight: 800;
+      background: var(--risk-color, #64748b);
+    }
+
+    .road-line-legend {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 7px 10px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .road-line-sample {
+      width: 42px;
+      height: 0;
+      border-top: var(--line-width, 3px) solid var(--line-color, #334155);
+      border-radius: 999px;
+    }
+
+    .road-line-sample.unpaved {
+      border-top-style: dashed;
+    }
+
+    .road-line-sample.unknown {
+      border-top-style: dotted;
+    }
+
+    .dot-sample.review-p1 {
+      width: 14px;
+      height: 14px;
+      background: var(--review-p1);
+      box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.24);
+    }
+
+    .dot-sample.review-p2 {
+      width: 14px;
+      height: 14px;
+      background: var(--review-p2);
+      box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.24);
+    }
+
+    .icon-sample {
+      width: 22px;
+      height: 22px;
+      border: 2px solid var(--accent);
+      border-radius: 7px;
+      background: var(--accent-soft);
+      display: grid;
+      place-items: center;
+    }
+
+    .icon-sample.crosswalk {
+      border-color: var(--crosswalk);
+      background: var(--crosswalk-soft);
+      color: var(--crosswalk-dark);
+    }
+
+    .icon-sample.facility {
+      border-color: var(--facility);
+      background: var(--facility-soft);
+      color: var(--facility-dark);
+    }
+
+    .icon-sample svg,
+    .stairs-marker svg,
+    .crosswalk-marker svg,
+    .facility-marker svg {
+      display: block;
+      width: 16px;
+      height: 16px;
+    }
+
+    .leaflet-control-attribution {
+      font-size: 10px;
+    }
+
+    .leaflet-popup-content-wrapper {
+      border-radius: 8px;
+    }
+
+    .leaflet-popup-content {
+      max-height: min(520px, calc(100vh - 180px));
+      overflow-y: auto;
+    }
+
+    .popup-title {
+      margin: 0 0 8px;
+      font-size: 14px;
+      font-weight: 750;
+    }
+
+    .popup-table {
+      border-collapse: collapse;
+      min-width: 190px;
+      font-size: 12px;
+    }
+
+    .popup-table th,
+    .popup-table td {
+      padding: 4px 0;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .popup-table th {
+      width: 64px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .popup-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .popup-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 32px;
+      padding: 0 10px;
+      border-radius: 8px;
+      background: #fee8d8;
+      color: var(--accent-dark);
+      font-size: 12px;
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    .popup-link:hover {
+      background: #ffd8bd;
+      color: #8f2500;
+    }
+
+    .manual-review-box {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid #d7dce5;
+      border-radius: 10px;
+      background: #f8fafc;
+    }
+
+    .manual-review-current {
+      color: #334155;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .manual-review-actions {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 5px;
+      position: sticky;
+      bottom: -1px;
+      z-index: 2;
+      margin-top: 2px;
+      padding-top: 7px;
+      background: linear-gradient(180deg, rgba(248, 250, 252, 0), #f8fafc 28%);
+    }
+
+    .manual-review-button {
+      min-height: 30px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #fff;
+      color: #334155;
+      font-size: 11px;
+      font-weight: 850;
+      cursor: pointer;
+    }
+
+    .manual-review-button.keep {
+      border-color: #bbf7d0;
+      background: #f0fdf4;
+      color: #166534;
+    }
+
+    .manual-review-button.remove {
+      border-color: #fecaca;
+      background: #fef2f2;
+      color: #991b1b;
+    }
+
+    .manual-review-button.fix {
+      border-color: #fed7aa;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+
+    .manual-review-button.review {
+      border-color: #ddd6fe;
+      background: #f5f3ff;
+      color: #5b21b6;
+    }
+
+    .manual-review-note {
+      width: 100%;
+      min-height: 54px;
+      resize: vertical;
+      padding: 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      color: #334155;
+      font: inherit;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .manual-review-note-save {
+      min-height: 30px;
+      border: 0;
+      border-radius: 8px;
+      background: #172033;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .manual-review-coordinate {
+      display: grid;
+      gap: 6px;
+      padding-top: 2px;
+    }
+
+    .manual-review-coordinate label {
+      display: grid;
+      gap: 4px;
+      color: #475569;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .manual-review-kakao-url {
+      width: 100%;
+      min-height: 32px;
+      padding: 7px 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      color: #334155;
+      font: inherit;
+      font-size: 12px;
+    }
+
+    .manual-review-coordinate-save {
+      min-height: 30px;
+      border: 0;
+      border-radius: 8px;
+      background: #0f766e;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 850;
+      cursor: pointer;
+    }
+
+    .manual-review-fixed-coordinate {
+      color: #0f766e;
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1.4;
+      word-break: break-all;
+    }
+
+    .manual-review-toolbar {
+      display: grid;
+      gap: 8px;
+    }
+
+    .manual-review-toolbar .button {
+      width: 100%;
+    }
+
+    .manual-review-hint {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .priority-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      margin-left: 6px;
+      padding: 0 7px;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      vertical-align: 1px;
+    }
+
+    .priority-badge.p1 {
+      background: var(--review-p1);
+    }
+
+    .priority-badge.p2 {
+      background: var(--review-p2);
+    }
+
+    .accessibility-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 8px;
+    }
+
+    .accessibility-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 0 7px;
+      border: 1px solid #d9e5ff;
+      border-radius: 999px;
+      background: var(--facility-soft);
+      color: var(--facility-dark);
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .accessibility-empty {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .accessibility-source-note {
+      margin-top: 10px;
+      color: #64748b;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .accessibility-source-note strong {
+      display: block;
+      margin-bottom: 4px;
+      color: #475569;
+      font-size: 11px;
+      letter-spacing: -0.01em;
+    }
+
+    .stairs-div-icon {
+      background: transparent;
+      border: 0;
+    }
+
+    .stairs-marker {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border: 2px solid var(--accent);
+      border-radius: 8px;
+      background: var(--accent-soft);
+      box-shadow: 0 8px 18px rgba(23, 32, 51, 0.22);
+      color: var(--accent-dark);
+      transform: translateZ(0);
+    }
+
+    .stairs-marker:hover {
+      border-color: #c92a2a;
+      color: #c92a2a;
+      background: #fff5f5;
+    }
+
+    .stairs-marker.manual-reviewed,
+    .facility-marker.manual-reviewed {
+      border-color: #16a34a;
+      box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.2), 0 8px 18px rgba(23, 32, 51, 0.22);
+    }
+
+    .stairs-marker.manual-remove,
+    .facility-marker.manual-remove {
+      border-color: #dc2626;
+      box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.18), 0 8px 18px rgba(23, 32, 51, 0.22);
+    }
+
+    .stairs-marker.manual-fix,
+    .facility-marker.manual-fix {
+      border-color: #f97316;
+      box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.2), 0 8px 18px rgba(23, 32, 51, 0.22);
+    }
+
+    .stairs-marker.manual-review,
+    .facility-marker.manual-review {
+      border-color: #7c3aed;
+      box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.18), 0 8px 18px rgba(23, 32, 51, 0.22);
+    }
+
+    .crosswalk-marker {
+      width: 32px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border: 2px solid var(--crosswalk);
+      border-radius: 7px;
+      background: var(--crosswalk-soft);
+      box-shadow: 0 8px 18px rgba(23, 32, 51, 0.2);
+      color: var(--crosswalk-dark);
+      transform: translateZ(0);
+    }
+
+    .crosswalk-marker:hover {
+      border-color: #0b7285;
+      color: #0b7285;
+      background: #e3fafc;
+    }
+
+    .facility-marker {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border: 2px solid var(--facility);
+      border-radius: 7px;
+      background: var(--facility-soft);
+      box-shadow: 0 8px 18px rgba(23, 32, 51, 0.2);
+      color: var(--facility-dark);
+      transform: translateZ(0);
+    }
+
+    .facility-marker:hover {
+      border-color: #1e40af;
+      color: #1e40af;
+      background: #dbeafe;
+    }
+
+    .accessibility-summary {
+      display: grid;
+      gap: 8px;
+      padding-top: 4px;
+      border-top: 1px solid rgba(23, 32, 51, 0.08);
+    }
+
+    .summary-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .summary-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .summary-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 0 8px;
+      border: 1px solid #d9e5ff;
+      border-radius: 999px;
+      background: var(--facility-soft);
+      color: var(--facility-dark);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 640px) {
+      .app-panel {
+        top: 10px;
+        left: 10px;
+        width: calc(100vw - 20px);
+        padding: 12px;
+      }
+
+      .map-legend-panel {
+        top: auto;
+        right: 10px;
+        bottom: 10px;
+        left: 10px;
+        width: auto;
+        min-width: 0;
+        max-height: 42vh;
+        padding: 12px;
+      }
+
+      .panel-title {
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="map" aria-label="부산 계단 지도"></div>
+
+  <aside class="app-panel" aria-label="계단 레이어 컨트롤">
+    <header class="panel-header">
+      <h1 class="panel-title">부산 보행약자 지도</h1>
+      <div class="panel-meta">
+        <span class="pill accent" id="stairsCountPill">계단 0개</span>
+        <span class="pill review" id="stairReviewCountPill">계단 검수 0/0개</span>
+        <span class="pill" id="crosswalkCountPill">횡단보도 0개</span>
+        <span class="pill" id="facilityCountPill">편의시설 0개</span>
+        <span class="pill road" id="roadSlopeSurfaceCountPill">도로 분석 OFF</span>
+        <span class="pill road" id="roadPolygonCountPill">도로면 OFF</span>
+        <span class="pill" id="modePill">표시 모드: 점</span>
+      </div>
+    </header>
+
+    <div class="control-grid">
+      <select class="select" id="districtSelect" aria-label="구군 선택"></select>
+      <button class="button" id="fitButton" type="button">전체</button>
+    </div>
+
+    <div class="view-status">
+      <strong>기본 보기</strong>
+      <span>강서구 · 계단 자동 채택 후보 · 횡단보도 · 편의시설 ON</span>
+    </div>
+
+    <section class="control-section" aria-label="계단 검수 레이어">
+      <div class="control-section-title">
+        <span>계단 검수</span>
+        <small>기본 ON</small>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-copy">
+          <strong>계단 후보</strong>
+          <small>P1/P2 채택 후보 790개만 표시</small>
+        </span>
+        <label class="switch">
+          <input id="stairReviewToggle" type="checkbox" checked />
+          <span aria-hidden="true"></span>
+        </label>
+      </div>
+      <div class="review-panel" id="stairReviewPanel">
+      <div class="review-title">
+        <span>검수 우선순위</span>
+        <span id="stairReviewPrioritySummary">자동 채택 후보</span>
+      </div>
+        <div class="priority-grid">
+          <label class="priority-option p1">
+            <input type="checkbox" data-priority-filter="P1" checked />
+            <span class="priority-swatch"></span>
+            <span id="priorityP1Label">P1 0개</span>
+          </label>
+          <label class="priority-option p2">
+            <input type="checkbox" data-priority-filter="P2" checked />
+            <span class="priority-swatch"></span>
+            <span id="priorityP2Label">P2 0개</span>
+          </label>
+        </div>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-copy">
+          <strong>계단 원천</strong>
+          <small>SHP 원천 전체. 후보와 비교할 때만 ON</small>
+        </span>
+        <label class="switch">
+          <input id="stairsToggle" type="checkbox" />
+          <span aria-hidden="true"></span>
+        </label>
+      </div>
+    </section>
+
+    <section class="control-section" aria-label="기본 참조 레이어">
+      <div class="control-section-title">
+        <span>기본 참조</span>
+        <small>기본 ON</small>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-copy">
+          <strong>횡단보도</strong>
+          <small>계단 후보 주변 보행 연결 단서</small>
+        </span>
+        <label class="switch">
+          <input id="crosswalksToggle" type="checkbox" checked />
+          <span aria-hidden="true"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-copy">
+          <strong>편의시설</strong>
+          <small>ERD v3 category + 접근성 feature</small>
+        </span>
+        <label class="switch">
+          <input id="facilitiesToggle" type="checkbox" checked />
+          <span aria-hidden="true"></span>
+        </label>
+      </div>
+      <div class="filter-row">
+        <span class="filter-label">편의시설 분류</span>
+        <select class="select" id="facilityCategorySelect" aria-label="편의시설 분류 선택"></select>
+      </div>
+    </section>
+
+    <section class="control-section" aria-label="도로 분석 레이어">
+      <div class="control-section-title">
+        <span>도로 분석</span>
+        <small>필요시 ON</small>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-copy">
+          <strong>경사·노면·폭</strong>
+          <small>선택 구군만 로드. 색/선/굵기로 표현</small>
+        </span>
+        <label class="switch">
+          <input id="roadSlopeSurfaceToggle" type="checkbox" />
+          <span aria-hidden="true"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-copy">
+          <strong>도로면 polygon</strong>
+          <small>도로 중심선+폭으로 만든 면 데이터</small>
+        </span>
+        <label class="switch">
+          <input id="roadPolygonsToggle" type="checkbox" />
+          <span aria-hidden="true"></span>
+        </label>
+      </div>
+      <div class="filter-row">
+        <span class="filter-label">경사</span>
+        <select class="select" id="roadRiskLevelSelect" aria-label="도로 임시 등급 필터" hidden>
+          <option value="all">전체</option>
+        </select>
+        <select class="select" id="roadColorModeSelect" aria-label="도로 색상 기준" hidden>
+          <option value="slope">색상: 경사도</option>
+        </select>
+        <select class="select" id="roadSlopeLevelSelect" aria-label="도로 경사 필터">
+          <option value="all">경사 전체</option>
+          <option value="VERY_GENTLE">0~3% 매우 완만</option>
+          <option value="GENTLE">3~5% 완만</option>
+          <option value="CAUTION">5~8% 주의</option>
+          <option value="SLOPED">8~12% 경사</option>
+          <option value="STEEP">12~20% 급경사</option>
+          <option value="VERY_STEEP">20~35% 매우 급경사</option>
+          <option value="DANGEROUS">35%+ 위험</option>
+          <option value="UNKNOWN">경사 미산출</option>
+        </select>
+      </div>
+      <div class="filter-row">
+        <span class="filter-label">노면 / 폭</span>
+        <select class="select" id="roadSurfaceSelect" aria-label="도로 노면 필터">
+          <option value="all">노면 전체</option>
+          <option value="PAVED">포장</option>
+          <option value="UNPAVED">비포장</option>
+          <option value="UNKNOWN">미분류</option>
+        </select>
+        <select class="select" id="roadWidthSelect" aria-label="도로 폭 필터">
+          <option value="all">폭 전체</option>
+          <option value="VERY_NARROW">2m 미만</option>
+          <option value="NARROW">2~4m</option>
+          <option value="MEDIUM">4~8m</option>
+          <option value="WIDE">8~10m</option>
+          <option value="VERY_WIDE">10m 초과</option>
+          <option value="UNKNOWN">폭 미분류</option>
+        </select>
+      </div>
+    </section>
+
+  </aside>
+
+  <aside class="map-legend-panel" aria-label="지도 범례">
+    <header class="legend-panel-header">
+      <h2 class="legend-panel-title">지도 범례</h2>
+      <p class="legend-panel-subtitle">오른쪽은 해석, 왼쪽은 조작입니다. 지도 확대 시 점 대신 아이콘으로 전환됩니다.</p>
+    </header>
+
+    <section class="legend-section" aria-label="레이어 운영 기준">
+      <div class="legend-section-title">
+        <span>레이어 운영 기준</span>
+        <small>팀 공유 기본값</small>
+      </div>
+      <div class="layer-policy-list">
+        <div class="layer-policy-item">
+          <span class="status-dot"></span>
+          <span><strong>기본 ON</strong>: 계단 채택 후보(P1/P2), 횡단보도, 편의시설</span>
+        </div>
+        <div class="layer-policy-item">
+          <span class="status-dot off"></span>
+          <span><strong>기본 OFF</strong>: 계단 원천, 도로 경사·노면·폭, 도로면 polygon</span>
+        </div>
+        <div class="layer-policy-item">
+          <span class="status-dot off"></span>
+          <span><strong>도로 레이어</strong>: 전체 부산을 한 번에 띄우지 않고 선택 구군만 로드</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="legend-section" aria-label="레이어 표시 방식">
+      <div class="legend-section-title">
+        <span>점 / 아이콘</span>
+        <small>축척별 표시</small>
+      </div>
+      <div class="layer-legend-list">
+        <div class="layer-legend-row">
+          <span class="dot-sample"></span>
+          <span class="legend-text"><strong>계단 점</strong><span>낮은 확대 단계에서 계단 위치를 가볍게 표시</span></span>
+        </div>
+        <div class="layer-legend-row">
+          <span class="icon-sample">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 18h5v-4h5v-4h5V6h3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+          <span class="legend-text"><strong>계단 아이콘</strong><span>확대 시 실제 계단 객체를 더 명확히 표시</span></span>
+        </div>
+        <div class="layer-legend-row">
+          <span class="dot-sample crosswalk"></span>
+          <span class="legend-text"><strong>횡단보도</strong><span>청록색 점/아이콘으로 표시</span></span>
+        </div>
+        <div class="layer-legend-row">
+          <span class="dot-sample facility"></span>
+          <span class="legend-text"><strong>보행약자 편의시설</strong><span>파란 점/건물 아이콘, 클릭 시 접근성 배지 표시</span></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="legend-section" aria-label="계단 검수 우선순위 설명">
+      <div class="legend-section-title">
+        <span>계단 후보 검증</span>
+        <small>채택 기준</small>
+      </div>
+      <div class="priority-legend-list">
+        <div class="priority-legend-row">
+          <span class="dot-sample review-p1"></span>
+          <span class="legend-text"><strong>P1 채택 후보</strong><span class="priority-description">도로 polygon 5m 이내. 실제 경로에 걸릴 가능성이 가장 큼</span></span>
+        </div>
+        <div class="priority-legend-row">
+          <span class="dot-sample review-p2"></span>
+          <span class="legend-text"><strong>P2 채택 후보</strong><span class="priority-description">도로 20m 이내 + 횡단보도/편의시설 근접. 자동 채택</span></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="legend-section" aria-label="도로 경사 노면 폭 범례">
+        <div class="road-layer-legend">
+          <div class="road-legend-title">
+            <span>도로 경사/노면/폭</span>
+            <span id="roadColorLegendLabel">색=경사, 모양=노면, 굵기=폭</span>
+          </div>
+        <div class="road-legend-section">
+          <span class="road-legend-section-title">경사 구간</span>
+          <div class="road-slope-scale">
+            <span class="road-slope-chip" style="--slope-color:#22c55e">0~3%<br />매우 완만</span>
+            <span class="road-slope-chip" style="--slope-color:#84cc16">3~5%<br />완만</span>
+            <span class="road-slope-chip" style="--slope-color:#eab308">5~8%<br />주의</span>
+            <span class="road-slope-chip" style="--slope-color:#f97316">8~12%<br />경사</span>
+            <span class="road-slope-chip" style="--slope-color:#ef4444">12~20%<br />급경사</span>
+            <span class="road-slope-chip" style="--slope-color:#be123c">20~35%<br />매우 급경사</span>
+            <span class="road-slope-chip" style="--slope-color:#581c87">35%+<br />위험</span>
+            <span class="road-slope-chip" style="--slope-color:#64748b">미산출<br />회색</span>
+          </div>
+        </div>
+        <div class="road-legend-section">
+          <span class="road-legend-section-title">노면 선 모양</span>
+          <div class="road-line-legend">
+            <span class="road-line-sample"></span>
+            <span>실선: 포장</span>
+            <span class="road-line-sample unpaved"></span>
+            <span>파선: 비포장</span>
+            <span class="road-line-sample unknown"></span>
+            <span>점선: 미분류</span>
+          </div>
+        </div>
+        <div class="road-legend-section">
+          <span class="road-legend-section-title">폭 선 굵기</span>
+          <div class="road-line-legend">
+            <span class="road-line-sample" style="--line-width:2px;--line-color:#0f172a"></span>
+            <span>2m 미만</span>
+            <span class="road-line-sample" style="--line-width:3px;--line-color:#0f172a"></span>
+            <span>2~4m</span>
+            <span class="road-line-sample" style="--line-width:4px;--line-color:#0f172a"></span>
+            <span>4~8m</span>
+            <span class="road-line-sample" style="--line-width:5px;--line-color:#0f172a"></span>
+            <span>8~10m</span>
+            <span class="road-line-sample" style="--line-width:6px;--line-color:#0f172a"></span>
+            <span>10m 초과</span>
+          </div>
+        </div>
+        <p class="road-legend-note">현재 지도에서는 경사 구간, 노면 포장 여부, 도로 폭만 해석합니다.</p>
+      </div>
+    </section>
+
+    <section class="legend-section" aria-label="편의시설 표시 설명">
+      <div class="legend-section-title">
+        <span>편의시설</span>
+        <small>장소 category</small>
+      </div>
+      <p class="facility-note">장소 category는 ERD v3의 7개 값만 사용합니다. 화장실과 전동보장구 충전소는 category가 아니라 접근성 featureType으로 조회합니다.</p>
+      <div class="facility-legend-categories" id="facilityLegendCategoryList"></div>
+    </section>
+
+    <section class="legend-section" aria-label="접근성 보유 정보">
+      <div class="accessibility-summary">
+        <div class="summary-title">
+          <span>접근성 featureType</span>
+          <span id="accessibilityTotal">0개 장소</span>
+        </div>
+        <div class="summary-list" id="accessibilitySummary"></div>
+      </div>
+      <p class="facility-note">빠른 필터 대상은 장애인 화장실, 엘리베이터, 전동보장구 충전 가능입니다. 나머지 접근성 feature는 상세 정보에서 확인합니다.</p>
+    </section>
+  </aside>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  ></script>
+  <script src="assets/data/stairs-data.js"></script>
+  <script src="assets/data/crosswalks-data.js"></script>
+  <script src="assets/data/facilities-data.js"></script>
+  <script src="assets/data/road-polygons-index-data.js"></script>
+  <script src="assets/data/road-slope-surface-index-data.js"></script>
+  <script src="assets/data/busan-stair-review-keep-review-data.js"></script>
+  <script src="assets/data/accessibility-summary-data.js"></script>
+  <script src="assets/data/manual-review-seed-data.js"></script>
+  <script>
+    const stairsData = window.STAIRS_GEOJSON ?? { features: [] };
+    const crosswalksData = window.CROSSWALKS_GEOJSON ?? { features: [] };
+    const facilitiesData = window.FACILITIES_GEOJSON ?? { features: [] };
+    const stairReviewData = window.BUSAN_STAIR_REVIEW_GEOJSON ?? { features: [] };
+    const accessibilitySummary = window.ACCESSIBILITY_SUMMARY ?? { totalPlaces: 0, items: [] };
+    const roadPolygonDistrictAssets = window.ROAD_POLYGON_DISTRICT_ASSETS ?? {};
+    const roadPolygonDistrictCounts = window.ROAD_POLYGON_DISTRICT_COUNTS ?? {};
+    const roadSlopeSurfaceDistrictAssets = window.ROAD_SLOPE_SURFACE_DISTRICT_ASSETS ?? {};
+    const roadSlopeSurfaceDistrictCounts = window.ROAD_SLOPE_SURFACE_DISTRICT_COUNTS ?? {};
+    const stairsFeatures = stairsData.features;
+    const crosswalkFeatures = crosswalksData.features;
+    const facilityFeatures = facilitiesData.features;
+    let roadPolygonFeatures = [];
+    let roadSlopeSurfaceFeatures = [];
+    const stairReviewFeatures = stairReviewData.features;
+    const loadedRoadPolygonDistricts = {};
+    const roadPolygonLoadPromises = {};
+    const loadedRoadSlopeSurfaceDistricts = {};
+    const roadSlopeSurfaceLoadPromises = {};
+    const stairsDotLayer = L.layerGroup();
+    const stairsIconLayer = L.layerGroup();
+    const crosswalkDotLayer = L.layerGroup();
+    const crosswalkIconLayer = L.layerGroup();
+    const facilityDotLayer = L.layerGroup();
+    const facilityIconLayer = L.layerGroup();
+    const roadSlopeSurfaceLayer = L.layerGroup();
+    const roadPolygonLayer = L.layerGroup();
+    const stairReviewLayer = L.layerGroup();
+    const canvasRenderer = L.canvas({ padding: 0.4 });
+    const state = {
+      stairsVisible: false,
+      stairReviewVisible: true,
+      crosswalksVisible: true,
+      facilitiesVisible: true,
+      roadSlopeSurfaceVisible: false,
+      roadPolygonsVisible: false,
+      stairReviewPriorities: new Set(["P1", "P2"]),
+      facilityCategory: "all",
+      roadRiskLevel: "all",
+      roadColorMode: "slope",
+      roadSlopeLevel: "all",
+      roadSurface: "all",
+      roadWidth: "all",
+      district: "강서구"
+    };
+    const stairReviewPriorities = ["P1", "P2"];
+    const stairReviewPriorityMeta = {
+      P1: {
+        label: "채택 후보",
+        description: "도로 polygon 5m 이내라 실제 보행 경로에 걸릴 가능성이 큼"
+      },
+      P2: {
+        label: "채택 후보",
+        description: "도로 20m 이내이고 횡단보도 30m 또는 편의시설 50m 단서가 있음"
+      }
+    };
+    const stairReviewColors = {
+      P1: "#e11d48",
+      P2: "#f97316"
+    };
+    const categorySourceLabels = {
+      disabled_public: "부산장애인편의시설 공공데이터",
+      source_fallback: "source 기준",
+      erd_v3_policy: "ERD v3 정책 반영"
+    };
+    const roadRiskMeta = {
+      LOW: {
+        label: "무난",
+        color: "#16a34a",
+        description: "점수 0~1: 포장 중심, 경사/폭 부담이 낮은 구간"
+      },
+      MEDIUM: {
+        label: "주의",
+        color: "#eab308",
+        description: "점수 2~3: 비포장 단독, 약한 경사, 좁은 폭 중 일부 포함"
+      },
+      HIGH: {
+        label: "어려움",
+        color: "#f97316",
+        description: "점수 4~5: 급경사·좁은 폭·비포장 조합으로 부담 큼"
+      },
+      VERY_HIGH: {
+        label: "회피 권장",
+        color: "#dc2626",
+        description: "점수 6+: 비포장+급경사+협소 폭 등 강한 위험 조합"
+      },
+      UNKNOWN: {
+        label: "확인 필요",
+        color: "#64748b",
+        description: "등급 산정에 필요한 값이 부족한 구간"
+      }
+    };
+    const manualReviewStorageKey = "busan_walk_poc_manual_review_v1";
+    const manualReviewStatusMeta = {
+      KEEP: { label: "유지", color: "#16a34a" },
+      REMOVE: { label: "제거", color: "#dc2626" },
+      FIX: { label: "수정", color: "#f97316" },
+      REVIEW: { label: "보류", color: "#7c3aed" }
+    };
+    const manualReviewTargetCache = {};
+    const manualReviewFeatureCache = {};
+    let manualReviewRecords = mergeManualReviewRecords(loadManualReviewSeedRecords(), loadManualReviewRecords());
+
+    const defaultMapCenter = [35.1796, 129.0756];
+    const defaultMapZoom = 11;
+    const busanCoordinateBounds = {
+      minLat: 34.6,
+      maxLat: 35.6,
+      minLng: 128.4,
+      maxLng: 129.7
+    };
+
+    const map = L.map("map", {
+      preferCanvas: true,
+      zoomControl: false,
+      closePopupOnClick: false
+    }).setView(defaultMapCenter, defaultMapZoom);
+
+    L.control.zoom({ position: "bottomright" }).addTo(map);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      maxNativeZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+    const popupOptions = {
+      autoPan: false,
+      keepInView: false,
+      closeOnClick: false,
+      autoClose: true
+    };
+
+    map.createPane("roadPolygonPane");
+    map.getPane("roadPolygonPane").style.zIndex = 330;
+    map.createPane("roadSlopeSurfacePane");
+    map.getPane("roadSlopeSurfacePane").style.zIndex = 335;
+    const roadCanvasRenderer = L.canvas({ padding: 0.4, pane: "roadPolygonPane" });
+    const roadSlopeSurfaceRenderer = L.canvas({ padding: 0.4, pane: "roadSlopeSurfacePane" });
+
+    stairsDotLayer.addTo(map);
+    stairsIconLayer.addTo(map);
+    crosswalkDotLayer.addTo(map);
+    crosswalkIconLayer.addTo(map);
+    facilityDotLayer.addTo(map);
+    facilityIconLayer.addTo(map);
+    roadSlopeSurfaceLayer.addTo(map);
+    roadPolygonLayer.addTo(map);
+    stairReviewLayer.addTo(map);
+
+    const stairsCountPill = document.getElementById("stairsCountPill");
+    const stairReviewCountPill = document.getElementById("stairReviewCountPill");
+    const crosswalkCountPill = document.getElementById("crosswalkCountPill");
+    const facilityCountPill = document.getElementById("facilityCountPill");
+    const roadSlopeSurfaceCountPill = document.getElementById("roadSlopeSurfaceCountPill");
+    const roadPolygonCountPill = document.getElementById("roadPolygonCountPill");
+    const modePill = document.getElementById("modePill");
+    const districtSelect = document.getElementById("districtSelect");
+    const fitButton = document.getElementById("fitButton");
+    const stairsToggle = document.getElementById("stairsToggle");
+    const stairReviewToggle = document.getElementById("stairReviewToggle");
+    const crosswalksToggle = document.getElementById("crosswalksToggle");
+    const facilitiesToggle = document.getElementById("facilitiesToggle");
+    const roadSlopeSurfaceToggle = document.getElementById("roadSlopeSurfaceToggle");
+    const roadPolygonsToggle = document.getElementById("roadPolygonsToggle");
+    const facilityCategorySelect = document.getElementById("facilityCategorySelect");
+    const roadRiskLevelSelect = document.getElementById("roadRiskLevelSelect");
+    const roadColorModeSelect = document.getElementById("roadColorModeSelect");
+    const roadSlopeLevelSelect = document.getElementById("roadSlopeLevelSelect");
+    const roadSurfaceSelect = document.getElementById("roadSurfaceSelect");
+    const roadWidthSelect = document.getElementById("roadWidthSelect");
+    const stairReviewPanel = document.getElementById("stairReviewPanel");
+    const stairReviewPrioritySummary = document.getElementById("stairReviewPrioritySummary");
+    const stairReviewPriorityInputs = [...document.querySelectorAll("[data-priority-filter]")];
+    const stairReviewPriorityCountLabels = Object.fromEntries(
+      stairReviewPriorities.map((priority) => [priority, document.getElementById(`priority${priority}Label`)])
+    );
+    const accessibilityTotal = document.getElementById("accessibilityTotal");
+    const accessibilitySummaryEl = document.getElementById("accessibilitySummary");
+    const facilityLegendCategoryList = document.getElementById("facilityLegendCategoryList");
+    const mapLegendPanel = document.querySelector(".map-legend-panel");
+    const roadColorLegendLabel = document.getElementById("roadColorLegendLabel");
+    const uiStateStorageKey = "busan_walk_poc_ui_state_v2";
+
+    function loadSavedUiState() {
+      try {
+        return JSON.parse(localStorage.getItem(uiStateStorageKey) || "{}");
+      } catch (error) {
+        console.warn("지도 UI 상태 저장소를 읽지 못했습니다.", error);
+        return {};
+      }
+    }
+
+    function saveUiState() {
+      const payload = {
+        stairsVisible: state.stairsVisible,
+        stairReviewVisible: state.stairReviewVisible,
+        crosswalksVisible: state.crosswalksVisible,
+        facilitiesVisible: state.facilitiesVisible,
+        roadSlopeSurfaceVisible: state.roadSlopeSurfaceVisible,
+        roadPolygonsVisible: state.roadPolygonsVisible,
+        stairReviewPriorities: [...state.stairReviewPriorities],
+        facilityCategory: state.facilityCategory,
+        roadRiskLevel: state.roadRiskLevel,
+        roadColorMode: state.roadColorMode,
+        roadSlopeLevel: state.roadSlopeLevel,
+        roadSurface: state.roadSurface,
+        roadWidth: state.roadWidth,
+        district: state.district
+      };
+      localStorage.setItem(uiStateStorageKey, JSON.stringify(payload));
+    }
+
+    function applySavedUiState() {
+      const saved = loadSavedUiState();
+      const booleanKeys = [
+        "stairsVisible",
+        "stairReviewVisible",
+        "crosswalksVisible",
+        "facilitiesVisible",
+        "roadSlopeSurfaceVisible",
+        "roadPolygonsVisible"
+      ];
+      booleanKeys.forEach((key) => {
+        if (typeof saved[key] === "boolean") {
+          state[key] = saved[key];
+        }
+      });
+
+      if (saved.district === "all" || districts.includes(saved.district)) {
+        state.district = saved.district;
+      }
+      if (Array.isArray(saved.stairReviewPriorities)) {
+        const validPriorities = saved.stairReviewPriorities.filter((priority) => stairReviewPriorities.includes(priority));
+        state.stairReviewPriorities = new Set(validPriorities.length ? validPriorities : stairReviewPriorities);
+      }
+      ["facilityCategory", "roadRiskLevel", "roadColorMode", "roadSlopeLevel", "roadSurface", "roadWidth"].forEach((key) => {
+        if (typeof saved[key] === "string" && saved[key]) {
+          state[key] = saved[key];
+        }
+      });
+    }
+
+    function syncUiControlsFromState() {
+      districtSelect.value = state.district;
+      stairsToggle.checked = state.stairsVisible;
+      stairReviewToggle.checked = state.stairReviewVisible;
+      crosswalksToggle.checked = state.crosswalksVisible;
+      facilitiesToggle.checked = state.facilitiesVisible;
+      roadSlopeSurfaceToggle.checked = state.roadSlopeSurfaceVisible;
+      roadPolygonsToggle.checked = state.roadPolygonsVisible;
+      roadRiskLevelSelect.value = state.roadRiskLevel;
+      roadColorModeSelect.value = state.roadColorMode;
+      roadSlopeLevelSelect.value = state.roadSlopeLevel;
+      roadSurfaceSelect.value = state.roadSurface;
+      roadWidthSelect.value = state.roadWidth;
+      stairReviewPriorityInputs.forEach((input) => {
+        input.checked = state.stairReviewPriorities.has(input.dataset.priorityFilter);
+      });
+      if (facilityCategorySelect.options.length) {
+        facilityCategorySelect.value = state.facilityCategory;
+      }
+    }
+
+    const districts = [
+      ...new Set(
+        [...stairsFeatures, ...crosswalkFeatures, ...facilityFeatures, ...stairReviewFeatures]
+          .map((feature) => feature.properties.districtGu)
+          .filter(Boolean)
+          .concat(Object.keys(roadPolygonDistrictAssets))
+          .concat(Object.keys(roadSlopeSurfaceDistrictAssets))
+      )
+    ].sort((a, b) => a.localeCompare(b, "ko"));
+
+    districtSelect.innerHTML = [
+      '<option value="all">부산 전체</option>',
+      ...districts.map((district) => `<option value="${escapeHtml(district)}">${escapeHtml(district)}</option>`)
+    ].join("");
+    const defaultDistrict = "강서구";
+    state.district = defaultDistrict;
+    applySavedUiState();
+    syncUiControlsFromState();
+
+    const facilityCategoryTotals = facilityFeatures.reduce((counts, feature) => {
+      const category = feature.properties.facilityCategory || "기타";
+      counts[category] = (counts[category] || 0) + 1;
+      return counts;
+    }, {});
+    const facilityCategories = Object.entries(facilityCategoryTotals)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko"));
+
+    function renderFacilityCategoryOptions() {
+      const districtFilteredFacilities = getFilteredFeatures(facilityFeatures);
+      const districtCategoryCounts = districtFilteredFacilities.reduce((counts, feature) => {
+        const category = feature.properties.facilityCategory || "기타";
+        counts[category] = (counts[category] || 0) + 1;
+        return counts;
+      }, {});
+
+      facilityCategorySelect.innerHTML = [
+        `<option value="all">편의시설 전체 ${districtFilteredFacilities.length.toLocaleString("ko-KR")}개</option>`,
+        ...facilityCategories.map(([category]) => {
+          const count = districtCategoryCounts[category] || 0;
+          return `<option value="${escapeHtml(category)}">${escapeHtml(category)} ${Number(count).toLocaleString("ko-KR")}개</option>`;
+        })
+      ].join("");
+      const validFacilityCategories = new Set(["all", ...facilityCategories.map(([category]) => category)]);
+      if (!validFacilityCategories.has(state.facilityCategory)) {
+        state.facilityCategory = "all";
+      }
+      facilityCategorySelect.value = state.facilityCategory;
+    }
+
+    function renderFacilityLegend() {
+      const districtFilteredFacilities = getFilteredFeatures(facilityFeatures);
+      const districtCategoryCounts = districtFilteredFacilities.reduce((counts, feature) => {
+        const category = feature.properties.facilityCategory || "기타";
+        counts[category] = (counts[category] || 0) + 1;
+        return counts;
+      }, {});
+      const rankedCategories = Object.entries(districtCategoryCounts)
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko"));
+      facilityLegendCategoryList.innerHTML = [
+        ...rankedCategories.map(([category, count]) => (
+          `<span class="facility-chip">${escapeHtml(category)} ${Number(count).toLocaleString("ko-KR")}</span>`
+        ))
+      ].filter(Boolean).join("");
+    }
+
+    renderFacilityCategoryOptions();
+    renderFacilityLegend();
+
+    function makeStairSvg() {
+      return `
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 18h5v-4h5v-4h5V6h3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      `;
+    }
+
+    function makeCrosswalkSvg() {
+      return `
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 7h14M4 12h16M5 17h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+        </svg>
+      `;
+    }
+
+    function makeFacilitySvg() {
+      return `
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6 20V5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v15M4 20h16M9 8h1M13 8h1M9 12h1M13 12h1M10 20v-4h2v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      `;
+    }
+
+    function getLatLng(feature) {
+      const [lng, lat] = feature.geometry.coordinates;
+      return [lat, lng];
+    }
+
+    function isBusanLatLng(lat, lng) {
+      const normalizedLat = Number(lat);
+      const normalizedLng = Number(lng);
+      return Number.isFinite(normalizedLat)
+        && Number.isFinite(normalizedLng)
+        && normalizedLat >= busanCoordinateBounds.minLat
+        && normalizedLat <= busanCoordinateBounds.maxLat
+        && normalizedLng >= busanCoordinateBounds.minLng
+        && normalizedLng <= busanCoordinateBounds.maxLng;
+    }
+
+    function getValidLatLng(feature) {
+      const [lat, lng] = getLatLng(feature);
+      return isBusanLatLng(lat, lng) ? [lat, lng] : null;
+    }
+
+    function roadviewUrlFromLatLng(lat, lng) {
+      return `https://map.kakao.com/link/roadview/${lat},${lng}`;
+    }
+
+    function loadManualReviewRecords() {
+      try {
+        return JSON.parse(localStorage.getItem(manualReviewStorageKey) || "{}");
+      } catch (error) {
+        console.warn("수동 검증 저장소를 읽지 못했습니다.", error);
+        return {};
+      }
+    }
+
+    function loadManualReviewSeedRecords() {
+      const seed = window.MANUAL_REVIEW_SEED;
+      return seed && typeof seed === "object" ? seed : {};
+    }
+
+    function mergeManualReviewRecords(seedRecords, storedRecords) {
+      const merged = { ...seedRecords };
+      Object.entries(storedRecords || {}).forEach(([key, record]) => {
+        merged[key] = {
+          ...(seedRecords[key] || {}),
+          ...record
+        };
+      });
+      return merged;
+    }
+
+    function saveManualReviewRecords() {
+      localStorage.setItem(manualReviewStorageKey, JSON.stringify(manualReviewRecords));
+    }
+
+    function manualReviewTargetType(type) {
+      if (type === "facility") {
+        return "facility";
+      }
+      if (type === "stairReview" || type === "stairs") {
+        return "stair";
+      }
+      return "";
+    }
+
+    function manualReviewBaseTarget(feature, type) {
+      const targetType = manualReviewTargetType(type);
+      if (!targetType || !feature?.geometry?.coordinates) {
+        return null;
+      }
+      const properties = feature.properties || {};
+      if (!properties.__manualReviewOriginalCoordinates) {
+        properties.__manualReviewOriginalCoordinates = [...feature.geometry.coordinates];
+      }
+      const [lng, lat] = properties.__manualReviewOriginalCoordinates;
+      const id = targetType === "facility"
+        ? properties.sourceKey || properties.placeId || properties.providerPlaceId || `${properties.name || "facility"}:${lat}:${lng}`
+        : properties.sourceId || properties.ufid || properties.duplicateClusterId || `${properties.name || "stair"}:${lat}:${lng}`;
+      return {
+        key: `${targetType}:${id}`,
+        targetType,
+        targetId: String(id),
+        lat,
+        lng
+      };
+    }
+
+    function hasFixedCoordinate(record) {
+      return isBusanLatLng(record?.fixedLat, record?.fixedLng);
+    }
+
+    function applyPersistedManualReviewCoordinate(feature, type) {
+      const base = manualReviewBaseTarget(feature, type);
+      if (!base) {
+        return;
+      }
+      const record = manualReviewRecords[base.key];
+      if (!hasFixedCoordinate(record)) {
+        return;
+      }
+      feature.geometry.coordinates = [Number(record.fixedLng), Number(record.fixedLat)];
+    }
+
+    function applyAllPersistedManualReviewCoordinates() {
+      facilityFeatures.forEach((feature) => applyPersistedManualReviewCoordinate(feature, "facility"));
+      stairsFeatures.forEach((feature) => applyPersistedManualReviewCoordinate(feature, "stairs"));
+      stairReviewFeatures.forEach((feature) => applyPersistedManualReviewCoordinate(feature, "stairReview"));
+    }
+
+    function manualReviewTarget(feature, type) {
+      const base = manualReviewBaseTarget(feature, type);
+      if (!base) {
+        return null;
+      }
+      const properties = feature.properties || {};
+      const target = {
+        key: base.key,
+        targetType: base.targetType,
+        targetId: base.targetId,
+        districtGu: properties.districtGu || "",
+        name: properties.name || (base.targetType === "facility" ? "보행약자 편의시설" : "계단 후보"),
+        category: base.targetType === "facility"
+          ? properties.facilityCategory || properties.dbCategory || ""
+          : properties.priority || "",
+        lat: base.lat,
+        lng: base.lng,
+        sourceKey: properties.sourceKey || "",
+        placeId: properties.placeId || "",
+        ufid: properties.ufid || "",
+        sourceId: properties.sourceId || ""
+      };
+      manualReviewTargetCache[target.key] = target;
+      manualReviewFeatureCache[target.key] = feature;
+      applyPersistedManualReviewCoordinate(feature, type);
+      return target;
+    }
+
+    function manualReviewRecordFor(feature, type) {
+      const target = manualReviewTarget(feature, type);
+      return target ? manualReviewRecords[target.key] : null;
+    }
+
+    function isManualReviewed(feature, type) {
+      return Boolean(manualReviewRecordFor(feature, type)?.status);
+    }
+
+    function isFacilityInternalOnly(feature) {
+      const record = manualReviewRecordFor(feature, "facility");
+      const coordinateQuality = String(record?.coordinateQuality || "").toUpperCase();
+      return coordinateQuality === "INTERNAL";
+    }
+
+    function isFacilityNameReviewRequired(feature) {
+      const properties = feature.properties || {};
+      const record = manualReviewRecordFor(feature, "facility");
+      const evidenceAction = String(record?.evidenceAction || "").toUpperCase();
+      const reviewFlags = Array.isArray(properties.reviewFlags) ? properties.reviewFlags : [];
+      return evidenceAction === "RENAME_REVIEW"
+        || evidenceAction === "MANUAL_REVIEW"
+        || evidenceAction === "REVIEW_OR_REMOVE"
+        || reviewFlags.includes("generic_name");
+    }
+
+    function isFacilityManualReviewRequired(feature) {
+      const record = manualReviewRecordFor(feature, "facility");
+      if (!record) {
+        return false;
+      }
+      const status = String(record.status || "").toUpperCase();
+      return !isFacilityInternalOnly(feature)
+        && (
+          isFacilityCategoryReviewRequired(feature)
+          || isFacilityNameReviewRequired(feature)
+          || (status && status !== "KEEP")
+        );
+    }
+
+    function isFacilityCategoryReviewRequired(feature) {
+      if (isFacilityInternalOnly(feature)) {
+        return false;
+      }
+      const record = manualReviewRecordFor(feature, "facility");
+      const evidenceAction = String(record?.evidenceAction || "").toUpperCase();
+      if (evidenceAction === "POLICY_CATEGORY_DECIDED") {
+        return false;
+      }
+      return evidenceAction.includes("CATEGORY");
+    }
+
+    function manualReviewStrokeColor(feature, type) {
+      const status = manualReviewRecordFor(feature, type)?.status;
+      return status ? manualReviewStatusMeta[status]?.color || "#16a34a" : "#ffffff";
+    }
+
+    function manualReviewWeight(feature, type, defaultWeight) {
+      return isManualReviewed(feature, type) ? Math.max(defaultWeight, 3.6) : defaultWeight;
+    }
+
+    function manualReviewClass(feature, type) {
+      const status = manualReviewRecordFor(feature, type)?.status;
+      return status ? ` manual-reviewed manual-${status.toLowerCase()}` : "";
+    }
+
+    function manualReviewHtml(feature, type) {
+      const target = manualReviewTarget(feature, type);
+      if (!target) {
+        return "";
+      }
+      const record = manualReviewRecords[target.key] || {};
+      const status = record.status || "";
+      const statusLabel = status ? `${manualReviewStatusMeta[status]?.label || status} (${status})` : "미검증";
+      const fixedCoordinateText = hasFixedCoordinate(record)
+        ? `수정 좌표: ${Number(record.fixedLat).toFixed(7)}, ${Number(record.fixedLng).toFixed(7)}`
+        : "수정 좌표 없음";
+      return `
+        <div class="manual-review-box" data-review-key="${escapeHtml(target.key)}">
+          <div class="manual-review-current">수동검증: <span data-review-current>${escapeHtml(statusLabel)}</span></div>
+          <textarea class="manual-review-note" data-review-note placeholder="판단 사유/수정할 내용">${escapeHtml(record.note || "")}</textarea>
+          <button class="manual-review-note-save" type="button" data-manual-review-note-save>메모 저장</button>
+          <div class="manual-review-coordinate">
+            <label>
+              카카오 로드뷰/지도 URL로 수정 좌표 저장
+              <input class="manual-review-kakao-url" data-review-kakao-url type="url" placeholder="https://map.kakao.com/?...urlX=...&urlY=..." value="${escapeHtml(record.fixedSourceUrl || "")}" />
+            </label>
+            <button class="manual-review-coordinate-save" type="button" data-manual-review-kakao-save>URL 좌표 저장</button>
+            <div class="manual-review-fixed-coordinate" data-review-fixed-coordinate>${escapeHtml(fixedCoordinateText)}</div>
+          </div>
+          <div class="manual-review-actions">
+            <button class="manual-review-button keep" type="button" data-manual-review-status="KEEP">유지</button>
+            <button class="manual-review-button remove" type="button" data-manual-review-status="REMOVE">제거</button>
+            <button class="manual-review-button fix" type="button" data-manual-review-status="FIX">수정</button>
+            <button class="manual-review-button review" type="button" data-manual-review-status="REVIEW">보류</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function getFilteredFeatures(sourceFeatures) {
+      if (state.district === "all") {
+        return sourceFeatures;
+      }
+      return sourceFeatures.filter((feature) => feature.properties.districtGu === state.district);
+    }
+
+    function getFilteredFacilities() {
+      const districtFiltered = getFilteredFeatures(facilityFeatures);
+      return state.facilityCategory === "all"
+        ? districtFiltered
+        : districtFiltered.filter((feature) => feature.properties.facilityCategory === state.facilityCategory);
+    }
+
+    function getFilteredRoadPolygons() {
+      if (state.district === "all") {
+        return [];
+      }
+      return roadPolygonFeatures;
+    }
+
+    function getFilteredRoadSlopeSurfaceFeatures() {
+      if (state.district === "all") {
+        return [];
+      }
+      return roadSlopeSurfaceFeatures.filter((feature) => {
+        const properties = feature.properties || {};
+        const riskMatches = state.roadRiskLevel === "all" || properties.riskLevel === state.roadRiskLevel;
+        const slopeMatches = state.roadSlopeLevel === "all" || properties.slopeLevel === state.roadSlopeLevel;
+        const surfaceMatches = state.roadSurface === "all" || properties.surfaceType === state.roadSurface;
+        const widthMatches = state.roadWidth === "all" || properties.widthLevel === state.roadWidth;
+        return riskMatches && slopeMatches && surfaceMatches && widthMatches;
+      });
+    }
+
+    function getDistrictStairReviews() {
+      return getFilteredFeatures(stairReviewFeatures);
+    }
+
+    function getFilteredStairReviews() {
+      return getDistrictStairReviews().filter((feature) => state.stairReviewPriorities.has(feature.properties.priority));
+    }
+
+    function syncFacilityCategoryControl() {
+      facilityCategorySelect.disabled = !state.facilitiesVisible;
+    }
+
+    function syncStairReviewControl() {
+      stairReviewPanel.style.opacity = state.stairReviewVisible ? "1" : "0.5";
+      stairReviewPriorityInputs.forEach((input) => {
+        input.disabled = !state.stairReviewVisible;
+      });
+    }
+
+    function syncRoadPolygonControl() {
+      const canShowRoadPolygons = state.district !== "all" && Boolean(roadPolygonDistrictAssets[state.district]);
+      roadPolygonsToggle.disabled = !canShowRoadPolygons;
+      if (!canShowRoadPolygons) {
+        state.roadPolygonsVisible = false;
+        roadPolygonsToggle.checked = false;
+        roadPolygonFeatures = [];
+      } else if (loadedRoadPolygonDistricts[state.district]) {
+        roadPolygonFeatures = loadedRoadPolygonDistricts[state.district].features || [];
+      } else {
+        roadPolygonFeatures = [];
+      }
+    }
+
+    function syncRoadSlopeSurfaceControl() {
+      const canShowRoadSlopeSurface = state.district !== "all" && Boolean(roadSlopeSurfaceDistrictAssets[state.district]);
+      roadSlopeSurfaceToggle.disabled = !canShowRoadSlopeSurface;
+      roadRiskLevelSelect.disabled = !state.roadSlopeSurfaceVisible || !canShowRoadSlopeSurface;
+      roadColorModeSelect.disabled = !state.roadSlopeSurfaceVisible || !canShowRoadSlopeSurface;
+      roadSlopeLevelSelect.disabled = !state.roadSlopeSurfaceVisible || !canShowRoadSlopeSurface;
+      roadSurfaceSelect.disabled = !state.roadSlopeSurfaceVisible || !canShowRoadSlopeSurface;
+      roadWidthSelect.disabled = !state.roadSlopeSurfaceVisible || !canShowRoadSlopeSurface;
+
+      if (!canShowRoadSlopeSurface) {
+        state.roadSlopeSurfaceVisible = false;
+        roadSlopeSurfaceToggle.checked = false;
+        roadSlopeSurfaceFeatures = [];
+      } else if (loadedRoadSlopeSurfaceDistricts[state.district]) {
+        roadSlopeSurfaceFeatures = loadedRoadSlopeSurfaceDistricts[state.district].features || [];
+      } else {
+        roadSlopeSurfaceFeatures = [];
+      }
+    }
+
+    function loadRoadPolygonsForDistrict(district) {
+      if (district === "all" || !roadPolygonDistrictAssets[district]) {
+        roadPolygonFeatures = [];
+        return Promise.resolve([]);
+      }
+
+      if (loadedRoadPolygonDistricts[district]) {
+        roadPolygonFeatures = loadedRoadPolygonDistricts[district].features || [];
+        return Promise.resolve(roadPolygonFeatures);
+      }
+
+      if (!roadPolygonLoadPromises[district]) {
+        roadPolygonLoadPromises[district] = new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = roadPolygonDistrictAssets[district];
+          script.async = true;
+          script.onload = () => {
+            const collection = window.ROAD_POLYGONS_BY_DISTRICT?.[district] ?? { features: [] };
+            loadedRoadPolygonDistricts[district] = collection;
+            if (state.district === district) {
+              roadPolygonFeatures = collection.features || [];
+            }
+            resolve(collection.features || []);
+          };
+          script.onerror = () => reject(new Error(`도로 polygon 로드 실패: ${district}`));
+          document.head.appendChild(script);
+        });
+      }
+
+      return roadPolygonLoadPromises[district];
+    }
+
+    function loadRoadSlopeSurfaceForDistrict(district) {
+      if (district === "all" || !roadSlopeSurfaceDistrictAssets[district]) {
+        roadSlopeSurfaceFeatures = [];
+        return Promise.resolve([]);
+      }
+
+      if (loadedRoadSlopeSurfaceDistricts[district]) {
+        roadSlopeSurfaceFeatures = loadedRoadSlopeSurfaceDistricts[district].features || [];
+        return Promise.resolve(roadSlopeSurfaceFeatures);
+      }
+
+      if (!roadSlopeSurfaceLoadPromises[district]) {
+        roadSlopeSurfaceLoadPromises[district] = new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = roadSlopeSurfaceDistrictAssets[district];
+          script.async = true;
+          script.onload = () => {
+            const collection = window.ROAD_SLOPE_SURFACE_BY_DISTRICT?.[district] ?? { features: [] };
+            loadedRoadSlopeSurfaceDistricts[district] = collection;
+            if (state.district === district) {
+              roadSlopeSurfaceFeatures = collection.features || [];
+            }
+            resolve(collection.features || []);
+          };
+          script.onerror = () => reject(new Error(`도로 경사/노면/폭 로드 실패: ${district}`));
+          document.head.appendChild(script);
+        });
+      }
+
+      return roadSlopeSurfaceLoadPromises[district];
+    }
+
+    function roadPolygonCountText(filteredRoadPolygons) {
+      if (state.district === "all") {
+        return "도로면 구군 선택 필요";
+      }
+      const expectedCount = Number(roadPolygonDistrictCounts[state.district] || 0);
+      if (state.roadPolygonsVisible && !loadedRoadPolygonDistricts[state.district] && roadPolygonDistrictAssets[state.district]) {
+        return `도로면 로딩 중 0/${expectedCount.toLocaleString("ko-KR")}개`;
+      }
+      const count = filteredRoadPolygons.length || expectedCount;
+      return `도로면 ${count.toLocaleString("ko-KR")}개`;
+    }
+
+    function roadSlopeSurfaceCountText(filteredRoadSlopeSurface) {
+      if (state.district === "all") {
+        return "도로 경사 구군 선택 필요";
+      }
+      const expectedCount = Number(roadSlopeSurfaceDistrictCounts[state.district] || 0);
+      if (state.roadSlopeSurfaceVisible && !loadedRoadSlopeSurfaceDistricts[state.district] && roadSlopeSurfaceDistrictAssets[state.district]) {
+        return `도로 경사 로딩 중 0/${expectedCount.toLocaleString("ko-KR")}개`;
+      }
+      const count = state.roadSlopeSurfaceVisible ? filteredRoadSlopeSurface.length : expectedCount;
+      return `도로 경사 ${Number(count || 0).toLocaleString("ko-KR")}개`;
+    }
+
+    function displayModeText(mode) {
+      return `표시 모드: ${mode}`;
+    }
+
+    function renderStairReviewPriorityCounts(features) {
+      const counts = features.reduce((acc, feature) => {
+        const priority = feature.properties.priority || "P2";
+        acc[priority] = (acc[priority] || 0) + 1;
+        return acc;
+      }, {});
+      stairReviewPriorities.forEach((priority) => {
+        const label = stairReviewPriorityCountLabels[priority];
+        if (label) {
+          label.textContent = `${priority} ${stairReviewPriorityMeta[priority].label} ${Number(counts[priority] || 0).toLocaleString("ko-KR")}개`;
+        }
+      });
+      const selected = stairReviewPriorities.filter((priority) => state.stairReviewPriorities.has(priority));
+      const isDefaultAdoptionReview =
+        selected.length === 2 && selected.includes("P1") && selected.includes("P2");
+      stairReviewPrioritySummary.textContent = isDefaultAdoptionReview
+        ? "자동 채택 후보"
+        : selected.length ? selected.join("/") : "선택 없음";
+    }
+
+    function getManualReviewTargetsInDistrict() {
+      const targets = [
+        ...getFilteredFacilities().map((feature) => manualReviewTarget(feature, "facility")),
+        ...getDistrictStairReviews().map((feature) => manualReviewTarget(feature, "stairReview"))
+      ].filter(Boolean);
+      return [...new Map(targets.map((target) => [target.key, target])).values()];
+    }
+
+    function renderManualReviewSummary() {
+      // 수동 검증 필터 UI는 제거했지만, 팝업 판정 저장/export 로직은 재사용 가능하게 유지한다.
+    }
+
+    function formatMeter(value) {
+      if (!value) {
+        return "-";
+      }
+      return `${Number(value).toLocaleString("ko-KR")}m`;
+    }
+
+    function formatArea(value) {
+      if (!value) {
+        return "-";
+      }
+      return `${Number(value).toLocaleString("ko-KR")}㎡`;
+    }
+
+    function popupHtml(feature, type) {
+      const properties = feature.properties;
+      if (type === "roadSlope") {
+        return `
+          <p class="popup-title">${escapeHtml(properties.name && properties.name !== "NULL" ? properties.name : properties.roadName && properties.roadName !== "NULL" ? properties.roadName : "전체 도로")}</p>
+          <table class="popup-table">
+            <tr><th>구군</th><td>${escapeHtml(properties.districtGu || "-")}</td></tr>
+            <tr><th>경사</th><td>${escapeHtml(properties.slopeLevelLabel || "-")} (${escapeHtml(properties.slopeRange || "-")})</td></tr>
+            <tr><th>평균/최대</th><td>${escapeHtml(properties.slopeMean ?? "-")}% / ${escapeHtml(properties.slopeMax ?? "-")}%</td></tr>
+            <tr><th>노면</th><td>${escapeHtml(properties.pavementQualityLabel || "-")}</td></tr>
+            <tr><th>폭</th><td>${formatMeter(properties.widthMeter)} (${escapeHtml(properties.widthLevelLabel || "-")})</td></tr>
+            <tr><th>차로</th><td>${escapeHtml(properties.laneCount || "-")}</td></tr>
+            <tr><th>도로구분</th><td>${escapeHtml(properties.roadDivisionLabel || properties.roadDivision || "-")}</td></tr>
+            <tr><th>UFID</th><td>${escapeHtml(properties.ufid || "-")}</td></tr>
+          </table>
+        `;
+      }
+
+      if (type === "road") {
+        return `
+          <p class="popup-title">${escapeHtml(properties.name && properties.name !== "NULL" ? properties.name : properties.roadName && properties.roadName !== "NULL" ? properties.roadName : "도로면 polygon")}</p>
+          <table class="popup-table">
+            <tr><th>구군</th><td>${escapeHtml(properties.districtGu || "-")}</td></tr>
+            <tr><th>도로구분</th><td>${escapeHtml(properties.roadDivisionLabel || properties.roadDivision || "-")}</td></tr>
+            <tr><th>포장</th><td>${escapeHtml(properties.pavementQualityLabel || properties.pavementQuality || "-")}</td></tr>
+            <tr><th>차로</th><td>${escapeHtml(properties.laneCount || "-")}</td></tr>
+            <tr><th>폭</th><td>${formatMeter(properties.widthMeter)}</td></tr>
+            <tr><th>버퍼</th><td>${formatMeter(properties.bufferMeter)}</td></tr>
+            <tr><th>UFID</th><td>${escapeHtml(properties.ufid || "-")}</td></tr>
+          </table>
+        `;
+      }
+
+      const [lng, lat] = feature.geometry.coordinates;
+      const kakaoRoadviewUrl = roadviewUrlFromLatLng(lat, lng);
+
+      if (type === "stairReview") {
+        const priority = properties.priority || "P2";
+        const priorityMeta = stairReviewPriorityMeta[priority] || stairReviewPriorityMeta.P2;
+        const autoDecision = properties.secondPassDecision || properties.firstPassDecision || "-";
+        const autoReason = properties.secondPassReasonCode || properties.firstPassReasonCode || "-";
+        return `
+          <p class="popup-title">
+            ${escapeHtml(properties.name || "계단 검수 후보")}
+            <span class="priority-badge ${escapeHtml(priority.toLowerCase())}">${escapeHtml(priority)} ${escapeHtml(priorityMeta.label)}</span>
+          </p>
+          <table class="popup-table">
+            <tr><th>자동 판정</th><td>${escapeHtml(autoDecision)}<br />${escapeHtml(autoReason)}</td></tr>
+            <tr><th>우선순위</th><td>${escapeHtml(priorityMeta.label)}<br />${escapeHtml(priorityMeta.description)}</td></tr>
+            <tr><th>상태</th><td>${escapeHtml(properties.reviewStatus || "-")}</td></tr>
+            <tr><th>사유</th><td>${escapeHtml(properties.reviewReason || "-")}</td></tr>
+            <tr><th>도로</th><td>${formatMeter(properties.nearestRoadDistanceM)}</td></tr>
+            <tr><th>횡단보도</th><td>${formatMeter(properties.nearestCrosswalkDistanceM)}</td></tr>
+            <tr><th>편의시설</th><td>${formatMeter(properties.nearestFacilityDistanceM)}</td></tr>
+            <tr><th>클러스터</th><td>${escapeHtml(properties.duplicateClusterId || "-")} / ${escapeHtml(properties.duplicateClusterSize || "1")}개</td></tr>
+            <tr><th>폭</th><td>${formatMeter(properties.widthMeter)}</td></tr>
+            <tr><th>면적</th><td>${formatArea(properties.areaSquareMeter)}</td></tr>
+            <tr><th>UFID</th><td>${escapeHtml(properties.ufid || "-")}</td></tr>
+          </table>
+          <div class="popup-actions">
+            <a class="popup-link" data-kakao-roadview-link href="${kakaoRoadviewUrl}" target="_blank" rel="noopener noreferrer">카카오 로드뷰</a>
+          </div>
+          ${manualReviewHtml(feature, type)}
+        `;
+      }
+
+      if (type === "crosswalk") {
+        return `
+          <p class="popup-title">${escapeHtml(properties.locationLabel || "횡단보도")}</p>
+          <table class="popup-table">
+            <tr><th>구군</th><td>${escapeHtml(properties.districtGu)}</td></tr>
+            <tr><th>동</th><td>${escapeHtml(properties.districtDong || "-")}</td></tr>
+            <tr><th>폭</th><td>${formatMeter(properties.widthMeter)}</td></tr>
+            <tr><th>길이</th><td>${formatMeter(properties.lengthMeter)}</td></tr>
+            <tr><th>면적</th><td>${formatArea(properties.areaSquareMeter)}</td></tr>
+            <tr><th>상태</th><td>${escapeHtml(formatCrossingState(properties.crossingState))}</td></tr>
+          </table>
+          <div class="popup-actions">
+            <a class="popup-link" data-kakao-roadview-link href="${kakaoRoadviewUrl}" target="_blank" rel="noopener noreferrer">카카오 로드뷰</a>
+          </div>
+          ${manualReviewHtml(feature, type)}
+        `;
+      }
+
+      if (type === "facility") {
+        const accessibilityTypes = Array.isArray(properties.accessibilityTypes) ? properties.accessibilityTypes : [];
+        const accessibility = Array.isArray(properties.accessibilityLabels) ? properties.accessibilityLabels : [];
+        const sourceAccessibilityTypes = Array.isArray(properties.sourceAccessibilityTypes) ? properties.sourceAccessibilityTypes : [];
+        const sourceAccessibilityLabels = Array.isArray(properties.sourceAccessibilityLabels) ? properties.sourceAccessibilityLabels : [];
+        const erdAccessibilityTypeSet = new Set(accessibilityTypes);
+        const sourceOnlyAccessibility = sourceAccessibilityTypes
+          .map((featureType, index) => ({
+            featureType,
+            label: sourceAccessibilityLabels[index] || featureType
+          }))
+          .filter((item) => !erdAccessibilityTypeSet.has(item.featureType));
+        const accessibilityHtml = accessibility.length
+          ? `<div class="accessibility-badges">${accessibility.map((label) => `<span class="accessibility-badge">${escapeHtml(label)}</span>`).join("")}</div>`
+          : '<div class="accessibility-empty">ERD 반영 접근성 정보 없음</div>';
+        const sourceAccessibilityHtml = sourceOnlyAccessibility.length
+          ? `<div class="accessibility-source-note"><strong>원본 참고정보 · ERD 미반영</strong>${sourceOnlyAccessibility.map((item) => escapeHtml(item.label)).join(", ")}</div>`
+          : "";
+        const categorySource = categorySourceLabels[properties.categorySource] || properties.categorySource || "-";
+        const rawCategory = properties.rawFacilityCategory || properties.publicFacilityType || properties.rawFacilityType || "-";
+        const dbCategory = properties.dbCategory
+          ? `${properties.dbCategory}${properties.dbCategoryLabel ? ` · ${properties.dbCategoryLabel}` : ""}`
+          : "-";
+        const publicTypeRow = properties.publicFacilityType
+          ? `<tr><th>공공분류</th><td>${escapeHtml(properties.publicFacilityType)}</td></tr>`
+          : "";
+        const sourcePlaceIdRow = properties.sourcePlaceId && String(properties.sourcePlaceId) !== String(properties.placeId)
+          ? `<tr><th>원본 placeId</th><td>${escapeHtml(properties.sourcePlaceId)}</td></tr>`
+          : "";
+        const reviewRecord = manualReviewRecordFor(feature, "facility") || {};
+        const categoryReviewRow = isFacilityCategoryReviewRequired(feature)
+          ? `<tr><th>검증 체크</th><td><strong>카테고리 재확인</strong><br /><span class="facility-note">카카오: ${escapeHtml(reviewRecord.kakaoPlaceName || "-")} / POI: ${escapeHtml(reviewRecord.poiName || "-")} / 액션: ${escapeHtml(reviewRecord.evidenceAction || "-")}</span></td></tr>`
+          : "";
+
+        return `
+          <p class="popup-title">${escapeHtml(properties.name || "보행약자 편의시설")}</p>
+          <table class="popup-table">
+            <tr><th>장소 category</th><td>${escapeHtml(dbCategory)}</td></tr>
+            <tr><th>UI 분류</th><td>${escapeHtml(properties.facilityCategory || "-")}</td></tr>
+            <tr><th>분류 기준</th><td>${escapeHtml(categorySource)}</td></tr>
+            ${publicTypeRow}
+            <tr><th>원본 분류</th><td>${escapeHtml(rawCategory)}</td></tr>
+            ${categoryReviewRow}
+            <tr><th>구군</th><td>${escapeHtml(properties.districtGu || "-")}</td></tr>
+            <tr><th>주소</th><td>${escapeHtml(properties.address || "-")}</td></tr>
+            <tr><th>출처</th><td>${escapeHtml(properties.displaySource || properties.uiCategory || properties.facilityCategory || "-")}</td></tr>
+            <tr><th>데이터 원천</th><td>${escapeHtml(properties.sourceDataset || "-")}</td></tr>
+            <tr><th>placeId</th><td>${escapeHtml(properties.placeId || "-")}</td></tr>
+            ${sourcePlaceIdRow}
+          </table>
+          ${accessibilityHtml}
+          ${sourceAccessibilityHtml}
+          <div class="popup-actions">
+            <a class="popup-link" data-kakao-roadview-link href="${kakaoRoadviewUrl}" target="_blank" rel="noopener noreferrer">카카오 로드뷰</a>
+          </div>
+          ${manualReviewHtml(feature, type)}
+        `;
+      }
+
+      return `
+        <p class="popup-title">${escapeHtml(properties.name || "계단")}</p>
+        <table class="popup-table">
+          <tr><th>구군</th><td>${escapeHtml(properties.districtGu)}</td></tr>
+          <tr><th>폭</th><td>${formatMeter(properties.widthMeter)}</td></tr>
+          <tr><th>면적</th><td>${formatArea(properties.areaSquareMeter)}</td></tr>
+          <tr><th>UFID</th><td>${escapeHtml(properties.ufid)}</td></tr>
+        </table>
+        <div class="popup-actions">
+          <a class="popup-link" data-kakao-roadview-link href="${kakaoRoadviewUrl}" target="_blank" rel="noopener noreferrer">카카오 로드뷰</a>
+        </div>
+        ${manualReviewHtml(feature, type)}
+      `;
+    }
+
+    function formatCrossingState(value) {
+      if (value === "TRAFFIC_SIGNALS") {
+        return "신호등 있음";
+      }
+      return value || "-";
+    }
+
+    function makeStairsDot(feature) {
+      return L.circleMarker(getLatLng(feature), {
+        renderer: canvasRenderer,
+        radius: 4.5,
+        color: manualReviewStrokeColor(feature, "stairs"),
+        weight: manualReviewWeight(feature, "stairs", 1.5),
+        fillColor: "#e8590c",
+        fillOpacity: 0.92
+      }).bindPopup(popupHtml(feature, "stairs"), popupOptions);
+    }
+
+    function makeStairsIcon(feature) {
+      return L.marker(getLatLng(feature), {
+        icon: L.divIcon({
+          className: "stairs-div-icon",
+          html: `<div class="stairs-marker${manualReviewClass(feature, "stairs")}">${makeStairSvg()}</div>`,
+          iconSize: [30, 30],
+          iconAnchor: [15, 15],
+          popupAnchor: [0, -14]
+        })
+      }).bindPopup(popupHtml(feature, "stairs"), popupOptions);
+    }
+
+    function makeStairReviewMarker(feature) {
+      const priority = feature.properties.priority || "P2";
+      const radius = priority === "P1" ? 8 : priority === "P2" ? 7 : 6;
+      return L.circleMarker(getLatLng(feature), {
+        renderer: canvasRenderer,
+        radius,
+        color: manualReviewStrokeColor(feature, "stairReview"),
+        weight: manualReviewWeight(feature, "stairReview", 2.4),
+        fillColor: stairReviewColors[priority] || stairReviewColors.P2,
+        fillOpacity: 0.96
+      }).bindPopup(popupHtml(feature, "stairReview"), popupOptions);
+    }
+
+    function makeCrosswalkDot(feature) {
+      return L.circleMarker(getLatLng(feature), {
+        renderer: canvasRenderer,
+        radius: 4.5,
+        color: "#ffffff",
+        weight: 1.5,
+        fillColor: "#0f8b8d",
+        fillOpacity: 0.88
+      }).bindPopup(popupHtml(feature, "crosswalk"), popupOptions);
+    }
+
+    function makeCrosswalkIcon(feature) {
+      return L.marker(getLatLng(feature), {
+        icon: L.divIcon({
+          className: "stairs-div-icon",
+          html: `<div class="crosswalk-marker">${makeCrosswalkSvg()}</div>`,
+          iconSize: [32, 24],
+          iconAnchor: [16, 12],
+          popupAnchor: [0, -12]
+        })
+      }).bindPopup(popupHtml(feature, "crosswalk"), popupOptions);
+    }
+
+    function makeFacilityDot(feature) {
+      return L.circleMarker(getLatLng(feature), {
+        renderer: canvasRenderer,
+        radius: 4.6,
+        color: manualReviewStrokeColor(feature, "facility"),
+        weight: manualReviewWeight(feature, "facility", 1.5),
+        fillColor: "#2563eb",
+        fillOpacity: 0.86
+      }).bindPopup(popupHtml(feature, "facility"), popupOptions);
+    }
+
+    function makeFacilityIcon(feature) {
+      return L.marker(getLatLng(feature), {
+        icon: L.divIcon({
+          className: "stairs-div-icon",
+          html: `<div class="facility-marker${manualReviewClass(feature, "facility")}">${makeFacilitySvg()}</div>`,
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
+          popupAnchor: [0, -12]
+        })
+      }).bindPopup(popupHtml(feature, "facility"), popupOptions);
+    }
+
+    function makeRoadSlopeSurfaceLayer(features) {
+      return L.geoJSON(features, {
+        renderer: roadSlopeSurfaceRenderer,
+        pane: "roadSlopeSurfacePane",
+        style: roadSlopeSurfaceStyle,
+        onEachFeature(feature, layer) {
+          layer.bindPopup(popupHtml(feature, "roadSlope"), popupOptions);
+        }
+      });
+    }
+
+    function roadSlopeColor(level) {
+      return {
+        VERY_GENTLE: "#22c55e",
+        GENTLE: "#84cc16",
+        CAUTION: "#eab308",
+        SLOPED: "#f97316",
+        STEEP: "#ef4444",
+        VERY_STEEP: "#be123c",
+        DANGEROUS: "#581c87",
+        UNKNOWN: "#64748b"
+      }[level] || "#64748b";
+    }
+
+    function roadRiskColor(level) {
+      return (roadRiskMeta[level] || roadRiskMeta.UNKNOWN).color;
+    }
+
+    function roadRiskLabel(level) {
+      return (roadRiskMeta[level] || roadRiskMeta.UNKNOWN).label;
+    }
+
+    function roadRiskDescription(level) {
+      return (roadRiskMeta[level] || roadRiskMeta.UNKNOWN).description;
+    }
+
+    function roadSurfaceDash(surfaceType) {
+      if (surfaceType === "UNPAVED") {
+        return "8 6";
+      }
+      if (surfaceType === "UNKNOWN") {
+        return "2 6";
+      }
+      return null;
+    }
+
+    function roadSlopeSurfaceStyle(feature) {
+      const properties = feature.properties || {};
+      const zoom = map.getZoom();
+      const baseWeight = zoom >= 17 ? 3.8 : zoom >= 15 ? 2.8 : zoom >= 13 ? 2.1 : 1.4;
+      const widthBoost = {
+        VERY_NARROW: 0,
+        NARROW: 0.25,
+        MEDIUM: 0.55,
+        WIDE: 0.85,
+        VERY_WIDE: 1.15
+      }[properties.widthLevel] ?? 0.35;
+      return {
+        color: roadSlopeColor(properties.slopeLevel),
+        weight: baseWeight + widthBoost,
+        opacity: 0.9,
+        dashArray: roadSurfaceDash(properties.surfaceType),
+        lineCap: "round",
+        lineJoin: "round",
+        interactive: true
+      };
+    }
+
+    function makeRoadPolygonLayer(features) {
+      return L.geoJSON(features, {
+        renderer: roadCanvasRenderer,
+        pane: "roadPolygonPane",
+        style: roadPolygonStyle,
+        onEachFeature(feature, layer) {
+          layer.bindPopup(popupHtml(feature, "road"), popupOptions);
+        }
+      });
+    }
+
+    function roadPolygonStyle(feature) {
+      const width = Number(feature.properties.widthMeter || 0);
+      const isNarrow = width > 0 && width <= 4;
+      const zoom = map.getZoom();
+      return {
+        color: isNarrow ? "#b91c1c" : "#dc2626",
+        weight: zoom >= 17 ? 3.2 : zoom >= 14 ? 2.4 : 1.6,
+        opacity: 0.95,
+        fillColor: isNarrow ? "#fef08a" : "#fde047",
+        fillOpacity: state.roadPolygonsVisible ? 0.48 : 0,
+        interactive: true
+      };
+    }
+
+    function setPillText(element, text, isActive = true) {
+      if (!element) {
+        return;
+      }
+      element.textContent = text;
+      element.classList.toggle("is-off", !isActive);
+    }
+
+    function hasOpenPopup() {
+      return Boolean(map._popup && map.hasLayer(map._popup));
+    }
+
+    function renderLayersUnlessPopupOpen() {
+      if (hasOpenPopup()) {
+        return;
+      }
+      renderLayers();
+    }
+
+    function renderLayers() {
+      stairsDotLayer.clearLayers();
+      stairsIconLayer.clearLayers();
+      crosswalkDotLayer.clearLayers();
+      crosswalkIconLayer.clearLayers();
+      facilityDotLayer.clearLayers();
+      facilityIconLayer.clearLayers();
+      roadSlopeSurfaceLayer.clearLayers();
+      roadPolygonLayer.clearLayers();
+      stairReviewLayer.clearLayers();
+      roadColorLegendLabel.textContent = "색=경사, 모양=노면, 굵기=폭";
+
+      const filteredStairs = getFilteredFeatures(stairsFeatures);
+      const filteredCrosswalks = getFilteredFeatures(crosswalkFeatures);
+      const filteredFacilities = getFilteredFacilities();
+      const filteredRoadSlopeSurface = getFilteredRoadSlopeSurfaceFeatures();
+      const filteredRoadPolygons = getFilteredRoadPolygons();
+      const districtStairReviews = getDistrictStairReviews();
+      const filteredStairReviews = getFilteredStairReviews();
+      setPillText(
+        stairsCountPill,
+        state.stairsVisible ? `계단 원천 ${filteredStairs.length.toLocaleString("ko-KR")}개` : "계단 원천 OFF",
+        state.stairsVisible
+      );
+      setPillText(
+        stairReviewCountPill,
+        state.stairReviewVisible
+          ? `계단 후보 ${filteredStairReviews.length.toLocaleString("ko-KR")}/${districtStairReviews.length.toLocaleString("ko-KR")}개`
+          : `계단 후보 OFF/${districtStairReviews.length.toLocaleString("ko-KR")}개`,
+        state.stairReviewVisible
+      );
+      setPillText(
+        crosswalkCountPill,
+        state.crosswalksVisible ? `횡단보도 ${filteredCrosswalks.length.toLocaleString("ko-KR")}개` : "횡단보도 OFF",
+        state.crosswalksVisible
+      );
+      const facilityLabel = state.facilityCategory === "all" ? "편의시설" : state.facilityCategory;
+      setPillText(
+        facilityCountPill,
+        state.facilitiesVisible ? `${facilityLabel} ${filteredFacilities.length.toLocaleString("ko-KR")}개` : "편의시설 OFF",
+        state.facilitiesVisible
+      );
+      renderManualReviewSummary();
+      setPillText(
+        roadSlopeSurfaceCountPill,
+        state.roadSlopeSurfaceVisible ? roadSlopeSurfaceCountText(filteredRoadSlopeSurface) : "도로 분석 OFF",
+        state.roadSlopeSurfaceVisible
+      );
+      setPillText(
+        roadPolygonCountPill,
+        state.roadPolygonsVisible ? roadPolygonCountText(filteredRoadPolygons) : "도로면 OFF",
+        state.roadPolygonsVisible
+      );
+      renderStairReviewPriorityCounts(districtStairReviews);
+
+      if (state.roadSlopeSurfaceVisible) {
+        roadSlopeSurfaceLayer.addLayer(makeRoadSlopeSurfaceLayer(filteredRoadSlopeSurface));
+      }
+
+      if (state.roadPolygonsVisible) {
+        roadPolygonLayer.addLayer(makeRoadPolygonLayer(filteredRoadPolygons));
+      }
+
+      if (state.stairReviewVisible) {
+        filteredStairReviews.forEach((feature) => stairReviewLayer.addLayer(makeStairReviewMarker(feature)));
+      }
+
+      if (!state.stairsVisible && !state.stairReviewVisible && !state.crosswalksVisible && !state.facilitiesVisible && !state.roadSlopeSurfaceVisible && !state.roadPolygonsVisible) {
+        modePill.textContent = displayModeText("꺼짐");
+        return;
+      }
+
+      if (map.getZoom() >= 16) {
+        modePill.textContent = displayModeText(state.stairReviewVisible ? "검수+아이콘" : "아이콘");
+        const markerBounds = map.getBounds().pad(0.35);
+        if (state.stairsVisible) {
+          filteredStairs
+            .filter((feature) => markerBounds.contains(getLatLng(feature)))
+            .forEach((feature) => stairsIconLayer.addLayer(makeStairsIcon(feature)));
+        }
+        if (state.crosswalksVisible) {
+          filteredCrosswalks
+            .filter((feature) => markerBounds.contains(getLatLng(feature)))
+            .forEach((feature) => crosswalkIconLayer.addLayer(makeCrosswalkIcon(feature)));
+        }
+        if (state.facilitiesVisible) {
+          filteredFacilities
+            .filter((feature) => markerBounds.contains(getLatLng(feature)))
+            .forEach((feature) => facilityIconLayer.addLayer(makeFacilityIcon(feature)));
+        }
+        return;
+      }
+
+      modePill.textContent = displayModeText(state.stairReviewVisible ? "검수+점" : "점");
+      if (state.stairsVisible) {
+        filteredStairs.forEach((feature) => stairsDotLayer.addLayer(makeStairsDot(feature)));
+      }
+      if (state.crosswalksVisible) {
+        filteredCrosswalks.forEach((feature) => crosswalkDotLayer.addLayer(makeCrosswalkDot(feature)));
+      }
+      if (state.facilitiesVisible) {
+        filteredFacilities.forEach((feature) => facilityDotLayer.addLayer(makeFacilityDot(feature)));
+      }
+    }
+
+    function fitToFiltered() {
+      const filtered = [];
+      if (state.stairsVisible) {
+        filtered.push(...getFilteredFeatures(stairsFeatures));
+      }
+      if (state.stairReviewVisible) {
+        filtered.push(...getFilteredStairReviews());
+      }
+      if (state.crosswalksVisible) {
+        filtered.push(...getFilteredFeatures(crosswalkFeatures));
+      }
+      if (state.facilitiesVisible) {
+        filtered.push(...getFilteredFacilities());
+      }
+      const filteredRoadSlopeSurface = state.roadSlopeSurfaceVisible ? getFilteredRoadSlopeSurfaceFeatures() : [];
+      const filteredRoadPolygons = state.roadPolygonsVisible ? getFilteredRoadPolygons() : [];
+      if (filtered.length === 0 && filteredRoadSlopeSurface.length === 0 && filteredRoadPolygons.length === 0) {
+        map.setView(defaultMapCenter, defaultMapZoom, { animate: false });
+        return;
+      }
+      const pointLatLngs = filtered.map(getValidLatLng).filter(Boolean);
+      const bounds = pointLatLngs.length ? L.latLngBounds(pointLatLngs) : L.latLngBounds([]);
+      filteredRoadSlopeSurface.forEach((feature) => {
+        if (Array.isArray(feature.bbox) && feature.bbox.length === 4) {
+          if (isBusanLatLng(feature.bbox[1], feature.bbox[0])) {
+            bounds.extend([feature.bbox[1], feature.bbox[0]]);
+          }
+          if (isBusanLatLng(feature.bbox[3], feature.bbox[2])) {
+            bounds.extend([feature.bbox[3], feature.bbox[2]]);
+          }
+        }
+      });
+      filteredRoadPolygons.forEach((feature) => {
+        if (Array.isArray(feature.bbox) && feature.bbox.length === 4) {
+          if (isBusanLatLng(feature.bbox[1], feature.bbox[0])) {
+            bounds.extend([feature.bbox[1], feature.bbox[0]]);
+          }
+          if (isBusanLatLng(feature.bbox[3], feature.bbox[2])) {
+            bounds.extend([feature.bbox[3], feature.bbox[2]]);
+          }
+        }
+      });
+      if (!bounds.isValid()) {
+        map.setView(defaultMapCenter, defaultMapZoom, { animate: false });
+        return;
+      }
+      map.stop();
+      map.fitBounds(bounds, { padding: [32, 32], maxZoom: 14, animate: false });
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function csvEscape(value) {
+      const text = String(value ?? "");
+      return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+    }
+
+    function meridianArc(phi) {
+      const majorAxisWgs84 = 6378137.0;
+      const fWgs84 = 1.0 / 298.257223563;
+      const eSq = fWgs84 * (2 - fWgs84);
+      const a = 1 - eSq / 4 - 3 * eSq * eSq / 64 - 5 * Math.pow(eSq, 3) / 256;
+      const b = 3 * eSq / 8 + 3 * eSq * eSq / 32 + 45 * Math.pow(eSq, 3) / 1024;
+      const c = 15 * eSq * eSq / 256 + 45 * Math.pow(eSq, 3) / 1024;
+      const d = 35 * Math.pow(eSq, 3) / 3072;
+      return majorAxisWgs84 * (a * phi - b * Math.sin(2 * phi) + c * Math.sin(4 * phi) - d * Math.sin(6 * phi));
+    }
+
+    function wcongnamulToWgs84(x, y) {
+      const majorAxisWgs84 = 6378137.0;
+      const fWgs84 = 1.0 / 298.257223563;
+      const centerLat = 38.0 * Math.PI / 180.0;
+      const centerLon = 127.0 * Math.PI / 180.0;
+      const falseEasting = 200000.0;
+      const falseNorthing = 500000.0;
+      const kakaoScale = 2.5;
+      const easting = Number(x) / kakaoScale;
+      const northing = Number(y) / kakaoScale;
+      const eSq = fWgs84 * (2 - fWgs84);
+      const e1 = (1 - Math.sqrt(1 - eSq)) / (1 + Math.sqrt(1 - eSq));
+      const m0 = meridianArc(centerLat);
+      const m = m0 + (northing - falseNorthing);
+      const mu = m / (majorAxisWgs84 * (1 - eSq / 4 - 3 * eSq * eSq / 64 - 5 * Math.pow(eSq, 3) / 256));
+      const c1 = 3 * e1 / 2 - 27 * Math.pow(e1, 3) / 32;
+      const c2 = 21 * e1 * e1 / 16 - 55 * Math.pow(e1, 4) / 32;
+      const c3 = 151 * Math.pow(e1, 3) / 96;
+      const phi1 = mu + c1 * Math.sin(2 * mu) + c2 * Math.sin(4 * mu) + c3 * Math.sin(6 * mu);
+      const sinPhi1 = Math.sin(phi1);
+      const cosPhi1 = Math.cos(phi1);
+      const tanPhi1 = Math.tan(phi1);
+      const factor = 1 - eSq * sinPhi1 * sinPhi1;
+      const nu1 = majorAxisWgs84 / Math.sqrt(factor);
+      const rho1 = majorAxisWgs84 * (1 - eSq) / Math.pow(factor, 1.5);
+      const eta1Sq = nu1 / rho1 - 1;
+      const d = (easting - falseEasting) / nu1;
+      const t1 = d * d / 2;
+      const t2 = Math.pow(d, 4) / 24 * (5 + 3 * tanPhi1 * tanPhi1 + eta1Sq - 9 * tanPhi1 * tanPhi1 * eta1Sq);
+      const t3 = Math.pow(d, 6) / 720 * (61 + 90 * tanPhi1 * tanPhi1 + 45 * Math.pow(tanPhi1, 4));
+      const latRad = phi1 - (nu1 * tanPhi1 / rho1) * (t1 - t2 + t3);
+      const l1 = d;
+      const l2 = Math.pow(d, 3) / 6 * (1 + 2 * tanPhi1 * tanPhi1 + eta1Sq);
+      const l3 = Math.pow(d, 5) / 120 * (5 + 28 * tanPhi1 * tanPhi1 + 24 * Math.pow(tanPhi1, 4) + 6 * eta1Sq + 8 * tanPhi1 * tanPhi1 * eta1Sq);
+      const lonRad = centerLon + (l1 - l2 + l3) / cosPhi1;
+      return {
+        lat: latRad * 180.0 / Math.PI,
+        lng: lonRad * 180.0 / Math.PI
+      };
+    }
+
+    function parseKakaoUrlCoordinate(value) {
+      const text = String(value || "").trim();
+      if (!text) {
+        throw new Error("카카오 URL을 입력하세요.");
+      }
+      const urlXMatch = text.match(/[?&]urlX=([0-9.-]+)/);
+      const urlYMatch = text.match(/[?&]urlY=([0-9.-]+)/);
+      if (urlXMatch && urlYMatch) {
+        const coordinate = {
+          ...wcongnamulToWgs84(Number(urlXMatch[1]), Number(urlYMatch[1])),
+          source: "kakao_urlx_urly",
+          urlX: Number(urlXMatch[1]),
+          urlY: Number(urlYMatch[1])
+        };
+        if (!isBusanLatLng(coordinate.lat, coordinate.lng)) {
+          throw new Error("부산 범위 밖 좌표입니다. 카카오 지도 URL을 다시 확인하세요.");
+        }
+        return coordinate;
+      }
+      const linkMatch = text.match(/\/link\/(?:map|roadview)\/([0-9.-]+),([0-9.-]+)/);
+      if (linkMatch) {
+        const coordinate = {
+          lat: Number(linkMatch[1]),
+          lng: Number(linkMatch[2]),
+          source: "kakao_link_wgs84",
+          urlX: "",
+          urlY: ""
+        };
+        if (!isBusanLatLng(coordinate.lat, coordinate.lng)) {
+          throw new Error("부산 범위 밖 좌표입니다. 카카오 지도 URL을 다시 확인하세요.");
+        }
+        return coordinate;
+      }
+      throw new Error("urlX/urlY 또는 /link/map/위도,경도 형식의 카카오 URL이 아닙니다.");
+    }
+
+    function updateManualReviewRecord(key, status, note, extra = {}) {
+      const target = manualReviewTargetCache[key] || { key };
+      const previous = manualReviewRecords[key] || {};
+      manualReviewRecords[key] = {
+        ...previous,
+        ...target,
+        lat: previous.lat || target.lat,
+        lng: previous.lng || target.lng,
+        status,
+        statusLabel: manualReviewStatusMeta[status]?.label || status,
+        note,
+        ...extra,
+        updatedAt: new Date().toISOString()
+      };
+      saveManualReviewRecords();
+    }
+
+    function applyManualReviewCoordinateToVisibleLayer(key, lat, lng) {
+      const nextLatLng = L.latLng(lat, lng);
+      const feature = manualReviewFeatureCache[key];
+      if (feature?.geometry?.coordinates) {
+        feature.geometry.coordinates = [lng, lat];
+      }
+
+      const sourceLayer = map._popup?._source;
+      if (sourceLayer?.setLatLng) {
+        sourceLayer.setLatLng(nextLatLng);
+      }
+      if (map._popup?.setLatLng) {
+        map._popup.setLatLng(nextLatLng);
+      }
+      const popupElement = map._popup?.getElement?.();
+      popupElement?.querySelectorAll("[data-kakao-roadview-link]").forEach((link) => {
+        link.href = roadviewUrlFromLatLng(lat, lng);
+      });
+    }
+
+    function handleManualReviewClick(event) {
+      const statusButton = event.target.closest("[data-manual-review-status]");
+      const noteButton = event.target.closest("[data-manual-review-note-save]");
+      const kakaoButton = event.target.closest("[data-manual-review-kakao-save]");
+      if (!statusButton && !noteButton && !kakaoButton) {
+        return;
+      }
+      const box = event.target.closest(".manual-review-box");
+      if (!box) {
+        return;
+      }
+      const key = box.dataset.reviewKey;
+      const note = box.querySelector("[data-review-note]")?.value.trim() || "";
+      const previousStatus = manualReviewRecords[key]?.status || "REVIEW";
+      let status = statusButton?.dataset.manualReviewStatus || previousStatus;
+      const extra = {};
+      let parsedCoordinate = null;
+      if (kakaoButton) {
+        try {
+          const kakaoUrl = box.querySelector("[data-review-kakao-url]")?.value.trim() || "";
+          const parsed = parseKakaoUrlCoordinate(kakaoUrl);
+          parsedCoordinate = parsed;
+          status = "FIX";
+          extra.fixedLat = parsed.lat;
+          extra.fixedLng = parsed.lng;
+          extra.fixedSource = parsed.source;
+          extra.fixedSourceUrl = kakaoUrl;
+          extra.kakaoUrlX = parsed.urlX;
+          extra.kakaoUrlY = parsed.urlY;
+          const coordinateEl = box.querySelector("[data-review-fixed-coordinate]");
+          if (coordinateEl) {
+            coordinateEl.textContent = `수정 좌표: ${parsed.lat.toFixed(7)}, ${parsed.lng.toFixed(7)}`;
+          }
+        } catch (error) {
+          alert(error.message);
+          return;
+        }
+      }
+      updateManualReviewRecord(key, status, note, extra);
+      const current = box.querySelector("[data-review-current]");
+      if (current) {
+        current.textContent = `${manualReviewStatusMeta[status]?.label || status} (${status})`;
+      }
+      if (parsedCoordinate) {
+        applyManualReviewCoordinateToVisibleLayer(key, parsedCoordinate.lat, parsedCoordinate.lng);
+      }
+      renderManualReviewSummary();
+      if (statusButton) {
+        const layer = box.closest(".leaflet-popup");
+        if (layer) {
+          layer.classList.add("manual-review-just-saved");
+        }
+      }
+    }
+
+    function exportManualReviewCsv() {
+      const district = state.district;
+      const records = Object.values(manualReviewRecords)
+        .filter((record) => district === "all" || record.districtGu === district)
+        .sort((a, b) => String(a.targetType).localeCompare(String(b.targetType)) || String(a.name).localeCompare(String(b.name), "ko"));
+      if (!records.length) {
+        alert("현재 구에 저장된 수동 검증 결과가 없습니다.");
+        return;
+      }
+      const headers = [
+        "key",
+        "targetType",
+        "targetId",
+        "districtGu",
+        "name",
+        "category",
+        "status",
+        "statusLabel",
+        "coordinateQuality",
+        "coordinateQualityReason",
+        "coordinateEvidenceSource",
+        "coordinateEvidenceDistanceM",
+        "note",
+        "lat",
+        "lng",
+        "fixedLat",
+        "fixedLng",
+        "fixedSource",
+        "fixedSourceUrl",
+        "kakaoUrlX",
+        "kakaoUrlY",
+        "sourceKey",
+        "placeId",
+        "ufid",
+        "sourceId",
+        "evidenceAction",
+        "evidencePrimarySource",
+        "kakaoStatus",
+        "kakaoPlaceName",
+        "kakaoDistanceM",
+        "poiStatus",
+        "poiName",
+        "poiDistanceM",
+        "updatedAt"
+      ];
+      const csv = [
+        headers.join(","),
+        ...records.map((record) => headers.map((header) => csvEscape(record[header])).join(","))
+      ].join("\r\n");
+      const blob = new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      const districtName = district === "all" ? "busan" : district;
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
+      anchor.href = url;
+      anchor.download = `manual_review_${districtName}_${timestamp}.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    districtSelect.addEventListener("change", (event) => {
+      state.district = event.target.value;
+      syncRoadSlopeSurfaceControl();
+      syncRoadPolygonControl();
+      renderFacilityCategoryOptions();
+      renderFacilityLegend();
+      syncUiControlsFromState();
+      saveUiState();
+      renderLayers();
+      const pendingLoads = [];
+      if (state.roadSlopeSurfaceVisible) {
+        pendingLoads.push(loadRoadSlopeSurfaceForDistrict(state.district));
+      }
+      if (state.roadPolygonsVisible) {
+        pendingLoads.push(loadRoadPolygonsForDistrict(state.district));
+      }
+      if (pendingLoads.length) {
+        Promise.all(pendingLoads)
+          .then(() => {
+            fitToFiltered();
+            renderLayers();
+          })
+          .catch((error) => {
+            console.error(error);
+            roadSlopeSurfaceCountPill.textContent = "도로 경사 로드 실패";
+          });
+      } else {
+        fitToFiltered();
+      }
+    });
+
+    fitButton.addEventListener("click", () => {
+      fitToFiltered();
+      renderLayers();
+    });
+
+    stairsToggle.addEventListener("change", (event) => {
+      state.stairsVisible = event.target.checked;
+      saveUiState();
+      renderLayers();
+    });
+
+    stairReviewToggle.addEventListener("change", (event) => {
+      state.stairReviewVisible = event.target.checked;
+      syncStairReviewControl();
+      saveUiState();
+      fitToFiltered();
+      renderLayers();
+    });
+
+    stairReviewPriorityInputs.forEach((input) => {
+      input.addEventListener("change", (event) => {
+        const priority = event.target.dataset.priorityFilter;
+        if (event.target.checked) {
+          state.stairReviewPriorities.add(priority);
+        } else {
+          state.stairReviewPriorities.delete(priority);
+        }
+        saveUiState();
+        fitToFiltered();
+        renderLayers();
+      });
+    });
+
+    crosswalksToggle.addEventListener("change", (event) => {
+      state.crosswalksVisible = event.target.checked;
+      saveUiState();
+      renderLayers();
+    });
+
+    facilitiesToggle.addEventListener("change", (event) => {
+      state.facilitiesVisible = event.target.checked;
+      syncFacilityCategoryControl();
+      saveUiState();
+      renderLayers();
+    });
+
+    roadSlopeSurfaceToggle.addEventListener("change", (event) => {
+      state.roadSlopeSurfaceVisible = event.target.checked;
+      syncRoadSlopeSurfaceControl();
+      saveUiState();
+      renderLayers();
+      if (state.roadSlopeSurfaceVisible) {
+        loadRoadSlopeSurfaceForDistrict(state.district)
+          .then(() => {
+            fitToFiltered();
+            renderLayers();
+          })
+          .catch((error) => {
+            console.error(error);
+            roadSlopeSurfaceCountPill.textContent = "도로 경사 로드 실패";
+          });
+      } else {
+        fitToFiltered();
+      }
+    });
+
+    roadPolygonsToggle.addEventListener("change", (event) => {
+      state.roadPolygonsVisible = event.target.checked;
+      saveUiState();
+      renderLayers();
+      if (state.roadPolygonsVisible) {
+        loadRoadPolygonsForDistrict(state.district)
+          .then(() => {
+            fitToFiltered();
+            renderLayers();
+          })
+          .catch((error) => {
+            console.error(error);
+            roadPolygonCountPill.textContent = "도로면 로드 실패";
+          });
+      } else {
+        fitToFiltered();
+      }
+    });
+
+    facilityCategorySelect.addEventListener("change", (event) => {
+      state.facilityCategory = event.target.value;
+      saveUiState();
+      fitToFiltered();
+      renderLayers();
+    });
+
+    document.addEventListener("click", handleManualReviewClick);
+
+    roadRiskLevelSelect.addEventListener("change", (event) => {
+      state.roadRiskLevel = event.target.value;
+      saveUiState();
+      fitToFiltered();
+      renderLayers();
+    });
+
+    roadColorModeSelect.addEventListener("change", (event) => {
+      state.roadColorMode = event.target.value;
+      saveUiState();
+      renderLayers();
+    });
+
+    roadSlopeLevelSelect.addEventListener("change", (event) => {
+      state.roadSlopeLevel = event.target.value;
+      saveUiState();
+      fitToFiltered();
+      renderLayers();
+    });
+
+    roadSurfaceSelect.addEventListener("change", (event) => {
+      state.roadSurface = event.target.value;
+      saveUiState();
+      fitToFiltered();
+      renderLayers();
+    });
+
+    roadWidthSelect.addEventListener("change", (event) => {
+      state.roadWidth = event.target.value;
+      saveUiState();
+      fitToFiltered();
+      renderLayers();
+    });
+
+    function renderAccessibilitySummary() {
+      accessibilityTotal.textContent = `${Number(accessibilitySummary.totalPlaces || 0).toLocaleString("ko-KR")}개 장소`;
+      accessibilitySummaryEl.innerHTML = accessibilitySummary.items
+        .map((item) => `<span class="summary-chip">${escapeHtml(item.label)} ${Number(item.count).toLocaleString("ko-KR")}</span>`)
+        .join("");
+    }
+
+    map.on("zoomend moveend", renderLayersUnlessPopupOpen);
+
+    if ("scrollRestoration" in history) {
+      history.scrollRestoration = "manual";
+    }
+    const resetLegendScroll = () => {
+      mapLegendPanel.scrollTop = 0;
+    };
+    resetLegendScroll();
+    window.addEventListener("load", () => {
+      requestAnimationFrame(resetLegendScroll);
+    });
+    syncFacilityCategoryControl();
+    syncStairReviewControl();
+    syncRoadSlopeSurfaceControl();
+    syncRoadPolygonControl();
+    syncUiControlsFromState();
+    saveUiState();
+    renderAccessibilitySummary();
+    applyAllPersistedManualReviewCoordinates();
+    const initialLoads = [];
+    if (state.roadSlopeSurfaceVisible) {
+      initialLoads.push(loadRoadSlopeSurfaceForDistrict(state.district));
+    }
+    if (state.roadPolygonsVisible) {
+      initialLoads.push(loadRoadPolygonsForDistrict(state.district));
+    }
+    Promise.all(initialLoads)
+      .catch((error) => console.error(error))
+      .finally(() => {
+        fitToFiltered();
+        renderLayers();
+      });
+  </script>
+</body>
+</html>

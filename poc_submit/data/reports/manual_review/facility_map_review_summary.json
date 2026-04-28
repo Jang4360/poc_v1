@@ -1,0 +1,215 @@
+{
+  "targetType": "facility",
+  "sourceAdoptedCsv": "C:\\Users\\SSAFY\\Desktop\\poc_submit\\data\\adopted\\adopted_places_with_accessibility.csv",
+  "sourceValidationCsv": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\reports\\facility_validation\\facility_kakao_poi_existence_rule_all.csv",
+  "outputAllCsv": "C:\\Users\\SSAFY\\Desktop\\poc_submit\\data\\reports\\manual_review\\facility_map_review_decisions_all.csv",
+  "outputAttentionCsv": "C:\\Users\\SSAFY\\Desktop\\poc_submit\\data\\reports\\manual_review\\facility_map_review_attention_targets.csv",
+  "outputHardCsv": "C:\\Users\\SSAFY\\Desktop\\poc_submit\\data\\reports\\manual_review\\facility_map_review_hard_targets.csv",
+  "outputInternalCsv": "C:\\Users\\SSAFY\\Desktop\\poc_submit\\data\\reports\\manual_review\\facility_map_review_internal_targets.csv",
+  "outputSeedJs": "C:\\Users\\SSAFY\\Desktop\\poc_submit\\assets\\data\\manual-review-seed-data.js",
+  "total": 3462,
+  "attentionTotal": 1206,
+  "hardReviewTotal": 306,
+  "internalReferenceTotal": 900,
+  "missingEvidenceCount": 0,
+  "missingEvidenceSample": [],
+  "byStatus": {
+    "KEEP": 3393,
+    "REMOVE": 2,
+    "REVIEW": 67
+  },
+  "byCoordinateQuality": {
+    "CHECK": 211,
+    "GOOD": 2258,
+    "INTERNAL": 943,
+    "BAD": 50
+  },
+  "byCategory": {
+    "TOILET": 1398,
+    "PUBLIC_OFFICE": 259,
+    "RESTAURANT": 679,
+    "TOURIST_SPOT": 149,
+    "WELFARE": 265,
+    "ACCOMMODATION": 227,
+    "CHARGING_STATION": 191,
+    "HEALTHCARE": 294
+  },
+  "byEvidenceAction": {
+    "POI_ONLY_RECHECK": 196,
+    "KEEP": 1425,
+    "CATEGORY_REVIEW": 715,
+    "POI_ONLY_CATEGORY_RECHECK": 91,
+    "RENAME_REVIEW": 979,
+    "MANUAL_REVIEW": 30,
+    "REMOVE_REVIEW": 2,
+    "REVIEW_OR_REMOVE": 24
+  },
+  "byDistrictStatus": {
+    "강서구": {
+      "KEEP": 268,
+      "REMOVE": 1,
+      "REVIEW": 10
+    },
+    "금정구": {
+      "KEEP": 147
+    },
+    "기장군": {
+      "KEEP": 432,
+      "REMOVE": 1,
+      "REVIEW": 6
+    },
+    "남구": {
+      "KEEP": 243,
+      "REVIEW": 16
+    },
+    "동구": {
+      "KEEP": 130,
+      "REVIEW": 2
+    },
+    "동래구": {
+      "KEEP": 127
+    },
+    "미분류": {
+      "KEEP": 5
+    },
+    "부산진구": {
+      "KEEP": 291,
+      "REVIEW": 2
+    },
+    "북구": {
+      "KEEP": 227,
+      "REVIEW": 8
+    },
+    "사상구": {
+      "KEEP": 173
+    },
+    "사하구": {
+      "KEEP": 157,
+      "REVIEW": 12
+    },
+    "서구": {
+      "KEEP": 146,
+      "REVIEW": 2
+    },
+    "수영구": {
+      "KEEP": 88
+    },
+    "연제구": {
+      "KEEP": 172,
+      "REVIEW": 1
+    },
+    "영도구": {
+      "KEEP": 185,
+      "REVIEW": 3
+    },
+    "중구": {
+      "KEEP": 131
+    },
+    "해운대구": {
+      "KEEP": 471,
+      "REVIEW": 5
+    }
+  },
+  "byDistrictCoordinateQuality": {
+    "강서구": {
+      "BAD": 10,
+      "CHECK": 24,
+      "GOOD": 176,
+      "INTERNAL": 69
+    },
+    "금정구": {
+      "BAD": 1,
+      "CHECK": 17,
+      "GOOD": 129
+    },
+    "기장군": {
+      "BAD": 8,
+      "CHECK": 39,
+      "GOOD": 312,
+      "INTERNAL": 80
+    },
+    "남구": {
+      "BAD": 1,
+      "CHECK": 17,
+      "GOOD": 126,
+      "INTERNAL": 115
+    },
+    "동구": {
+      "BAD": 2,
+      "CHECK": 9,
+      "GOOD": 64,
+      "INTERNAL": 57
+    },
+    "동래구": {
+      "BAD": 2,
+      "CHECK": 4,
+      "GOOD": 117,
+      "INTERNAL": 4
+    },
+    "미분류": {
+      "CHECK": 1,
+      "GOOD": 1,
+      "INTERNAL": 3
+    },
+    "부산진구": {
+      "BAD": 4,
+      "CHECK": 9,
+      "GOOD": 160,
+      "INTERNAL": 120
+    },
+    "북구": {
+      "BAD": 4,
+      "CHECK": 7,
+      "GOOD": 143,
+      "INTERNAL": 81
+    },
+    "사상구": {
+      "BAD": 1,
+      "CHECK": 8,
+      "GOOD": 148,
+      "INTERNAL": 16
+    },
+    "사하구": {
+      "BAD": 5,
+      "CHECK": 12,
+      "GOOD": 60,
+      "INTERNAL": 92
+    },
+    "서구": {
+      "BAD": 1,
+      "CHECK": 8,
+      "GOOD": 85,
+      "INTERNAL": 54
+    },
+    "수영구": {
+      "CHECK": 6,
+      "GOOD": 81,
+      "INTERNAL": 1
+    },
+    "연제구": {
+      "BAD": 5,
+      "CHECK": 3,
+      "GOOD": 122,
+      "INTERNAL": 43
+    },
+    "영도구": {
+      "BAD": 1,
+      "CHECK": 7,
+      "GOOD": 124,
+      "INTERNAL": 56
+    },
+    "중구": {
+      "BAD": 1,
+      "CHECK": 6,
+      "GOOD": 73,
+      "INTERNAL": 51
+    },
+    "해운대구": {
+      "BAD": 4,
+      "CHECK": 34,
+      "GOOD": 337,
+      "INTERNAL": 101
+    }
+  },
+  "updatedAt": "2026-04-27T16:09:24.750772+00:00"
+}

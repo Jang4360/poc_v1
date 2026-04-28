@@ -1,0 +1,26 @@
+{
+  "root": "C:\\Users\\SSAFY\\Desktop\\poc",
+  "processedCandidates": 249,
+  "changed": 86,
+  "changedByCategory": {
+    "ETC": 86
+  },
+  "policyAfterCategoryCounts": {
+    "TOURIST_SPOT": 12,
+    "ETC": 86,
+    "ACCOMMODATION": 3,
+    "WELFARE": 15,
+    "PUBLIC_OFFICE": 3,
+    "TOILET": 130
+  },
+  "changedBeforeCategoryCounts": {
+    "TOURIST_SPOT": 12,
+    "RESTAURANT": 53,
+    "HEALTHCARE": 19,
+    "WELFARE": 2
+  },
+  "changedAfterCategoryCounts": {
+    "ETC": 86
+  },
+  "mappingFile": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\reports\\facility_validation\\facility_policy_category_decisions_applied.csv"
+}

@@ -1,0 +1,163 @@
+{
+  "input": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_first_pass_decisions.csv",
+  "outputs": {
+    "all": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_second_pass_decisions.csv",
+    "likelyAdopt": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_second_pass_likely_adopt.csv",
+    "likelyExclude": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_second_pass_likely_exclude.csv",
+    "manualReview": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_second_pass_manual_review.csv"
+  },
+  "counts": {
+    "total": 2617,
+    "likelyAdopt": 1214,
+    "likelyExclude": 661,
+    "manualReview": 742
+  },
+  "decisionCounts": {
+    "LIKELY_ADOPT": 1214,
+    "LIKELY_EXCLUDE": 661,
+    "MANUAL_REVIEW": 742
+  },
+  "decisionByPriority": {
+    "P1": {
+      "LIKELY_ADOPT": 659,
+      "MANUAL_REVIEW": 17,
+      "LIKELY_EXCLUDE": 21
+    },
+    "P2": {
+      "LIKELY_ADOPT": 108,
+      "LIKELY_EXCLUDE": 12,
+      "MANUAL_REVIEW": 11
+    },
+    "P3": {
+      "LIKELY_ADOPT": 208,
+      "MANUAL_REVIEW": 382,
+      "LIKELY_EXCLUDE": 188
+    },
+    "P4": {
+      "LIKELY_EXCLUDE": 440,
+      "MANUAL_REVIEW": 332,
+      "LIKELY_ADOPT": 239
+    }
+  },
+  "decisionByFirstPass": {
+    "LIKELY_ADOPT": {
+      "LIKELY_ADOPT": 876
+    },
+    "LIKELY_EXCLUDE": {
+      "LIKELY_EXCLUDE": 208
+    },
+    "MANUAL_REVIEW": {
+      "LIKELY_EXCLUDE": 453,
+      "LIKELY_ADOPT": 338,
+      "MANUAL_REVIEW": 742
+    }
+  },
+  "reasonCodeByDecision": {
+    "LIKELY_ADOPT": {
+      "first_pass_likely_adopt": 876,
+      "p3_public_walk_context_promoted": 85,
+      "p1_p2_public_context_promoted": 14,
+      "p4_public_context_promoted_but_low_connectivity": 239
+    },
+    "LIKELY_EXCLUDE": {
+      "p1_p2_private_or_commercial_context_weak_walk_clue": 9,
+      "p3_private_or_commercial_context_weak_walk_clue": 57,
+      "p3_isolated_no_public_walk_clue": 12,
+      "residential_internal_or_private_access": 304,
+      "religious_site_internal_access": 15,
+      "first_pass_likely_exclude": 208,
+      "p4_low_connectivity_no_public_walk_clue": 6,
+      "p4_far_from_road_and_public_facility": 50
+    },
+    "MANUAL_REVIEW": {
+      "p3_no_nearby_crosswalk_or_facility_still_needs_visual_check": 335,
+      "p3_close_road_generic_needs_visual_check_still_needs_visual_check": 25,
+      "p1_p2_still_needs_visual_context": 4,
+      "residential_near_public_clue_needs_visual_check": 97,
+      "p4_public_or_edge_case_needs_visual_check": 281
+    }
+  },
+  "districtDecisionCounts": {
+    "강서구": {
+      "LIKELY_ADOPT": 168,
+      "LIKELY_EXCLUDE": 55,
+      "MANUAL_REVIEW": 136
+    },
+    "금정구": {
+      "LIKELY_ADOPT": 77,
+      "MANUAL_REVIEW": 36,
+      "LIKELY_EXCLUDE": 43
+    },
+    "기장군": {
+      "LIKELY_ADOPT": 132,
+      "MANUAL_REVIEW": 101,
+      "LIKELY_EXCLUDE": 62
+    },
+    "남구": {
+      "LIKELY_ADOPT": 37,
+      "LIKELY_EXCLUDE": 25,
+      "MANUAL_REVIEW": 17
+    },
+    "동구": {
+      "LIKELY_ADOPT": 52,
+      "MANUAL_REVIEW": 21,
+      "LIKELY_EXCLUDE": 9
+    },
+    "동래구": {
+      "LIKELY_ADOPT": 46,
+      "LIKELY_EXCLUDE": 36,
+      "MANUAL_REVIEW": 22
+    },
+    "부산진구": {
+      "LIKELY_ADOPT": 68,
+      "MANUAL_REVIEW": 43,
+      "LIKELY_EXCLUDE": 34
+    },
+    "북구": {
+      "LIKELY_ADOPT": 72,
+      "MANUAL_REVIEW": 50,
+      "LIKELY_EXCLUDE": 57
+    },
+    "사상구": {
+      "LIKELY_ADOPT": 223,
+      "LIKELY_EXCLUDE": 211,
+      "MANUAL_REVIEW": 111
+    },
+    "사하구": {
+      "LIKELY_ADOPT": 54,
+      "MANUAL_REVIEW": 32,
+      "LIKELY_EXCLUDE": 38
+    },
+    "서구": {
+      "LIKELY_ADOPT": 45,
+      "MANUAL_REVIEW": 13,
+      "LIKELY_EXCLUDE": 7
+    },
+    "수영구": {
+      "LIKELY_ADOPT": 20,
+      "LIKELY_EXCLUDE": 16,
+      "MANUAL_REVIEW": 6
+    },
+    "연제구": {
+      "LIKELY_ADOPT": 34,
+      "MANUAL_REVIEW": 19,
+      "LIKELY_EXCLUDE": 9
+    },
+    "영도구": {
+      "LIKELY_ADOPT": 41,
+      "LIKELY_EXCLUDE": 17,
+      "MANUAL_REVIEW": 31
+    },
+    "중구": {
+      "LIKELY_ADOPT": 53,
+      "LIKELY_EXCLUDE": 11,
+      "MANUAL_REVIEW": 44
+    },
+    "해운대구": {
+      "LIKELY_ADOPT": 92,
+      "LIKELY_EXCLUDE": 31,
+      "MANUAL_REVIEW": 60
+    }
+  },
+  "note": "Second pass reduces MANUAL_REVIEW using only data-context rules. It is not roadview confirmation."
+}

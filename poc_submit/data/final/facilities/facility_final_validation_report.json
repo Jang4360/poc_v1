@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "checks": [
+    {
+      "name": "ERD v3 source sync",
+      "passed": true,
+      "detail": "workspace/place + workspace/accessibility erd_ready"
+    }
+  ],
+  "blockingFailureCount": 0,
+  "qualityWarningCount": 0
+}

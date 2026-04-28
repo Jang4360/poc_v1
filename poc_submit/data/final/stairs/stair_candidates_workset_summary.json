@@ -1,0 +1,126 @@
+{
+  "source": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\reports\\stair_review\\busan_stair_review_candidates.csv",
+  "findings": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\reports\\stair_review\\stair_direct_exclusion_findings.csv",
+  "outputs": {
+    "keepReview": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_candidates_keep_review.csv",
+    "p4ManualReview": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_candidates_p4_manual_review.csv",
+    "residentialManualReview": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_candidates_residential_manual_review.csv",
+    "excluded": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_candidates_excluded.csv"
+  },
+  "counts": {
+    "total": 3744,
+    "keepReview": 1479,
+    "p4ManualReview": 776,
+    "residentialManualReview": 362,
+    "excluded": 1127
+  },
+  "priorityCounts": {
+    "keepReview": {
+      "P1": 666,
+      "P2": 124,
+      "P3": 689
+    },
+    "p4ManualReview": {
+      "P4": 776
+    },
+    "residentialManualReview": {
+      "P1": 31,
+      "P3": 89,
+      "P4": 235,
+      "P2": 7
+    },
+    "excluded": {
+      "P3": 84,
+      "P4": 1005,
+      "P1": 31,
+      "P2": 7
+    }
+  },
+  "excludedByDecision": {
+    "EXCLUDE_PRIVATE_SCHOOL_CAMPUS": 1025,
+    "EXCLUDE_PRIVATE_INDUSTRIAL": 10,
+    "EXCLUDE_LOW_CONNECTIVITY_VERY_STRONG": 73,
+    "EXCLUDE_PRIVATE_RELIGIOUS": 14,
+    "EXCLUDE_PRIVATE_BUILDING_COMMERCIAL": 5
+  },
+  "p4ReviewByDecision": {
+    "REVIEW_P4_NEAR_ROAD_OR_CLUE": 481,
+    "REVIEW_P4_PUBLIC_CONTEXT": 182,
+    "REVIEW_P4_LOW_CONNECTIVITY": 113
+  },
+  "residentialReviewByDecision": {
+    "EXCLUDE_PRIVATE_RESIDENTIAL": 362
+  },
+  "districtCounts": {
+    "keepReview": {
+      "강서구": 246,
+      "금정구": 85,
+      "기장군": 134,
+      "남구": 54,
+      "동구": 60,
+      "동래구": 59,
+      "부산진구": 86,
+      "북구": 83,
+      "사상구": 259,
+      "사하구": 75,
+      "서구": 43,
+      "수영구": 25,
+      "연제구": 44,
+      "영도구": 60,
+      "중구": 70,
+      "해운대구": 96
+    },
+    "p4ManualReview": {
+      "강서구": 113,
+      "금정구": 57,
+      "기장군": 153,
+      "남구": 18,
+      "동구": 21,
+      "동래구": 29,
+      "부산진구": 49,
+      "북구": 48,
+      "사상구": 85,
+      "사하구": 29,
+      "서구": 19,
+      "수영구": 10,
+      "연제구": 18,
+      "영도구": 20,
+      "중구": 37,
+      "해운대구": 70
+    },
+    "residentialManualReview": {
+      "금정구": 14,
+      "기장군": 8,
+      "남구": 7,
+      "동구": 1,
+      "동래구": 16,
+      "부산진구": 10,
+      "북구": 48,
+      "사상구": 201,
+      "사하구": 20,
+      "서구": 3,
+      "수영구": 7,
+      "영도구": 9,
+      "중구": 1,
+      "해운대구": 17
+    },
+    "excluded": {
+      "강서구": 6,
+      "금정구": 229,
+      "기장군": 70,
+      "남구": 69,
+      "동구": 10,
+      "동래구": 104,
+      "부산진구": 110,
+      "북구": 73,
+      "사상구": 114,
+      "사하구": 55,
+      "서구": 19,
+      "수영구": 29,
+      "연제구": 65,
+      "영도구": 59,
+      "중구": 1,
+      "해운대구": 114
+    }
+  }
+}

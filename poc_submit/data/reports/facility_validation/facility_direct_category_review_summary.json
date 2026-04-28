@@ -1,0 +1,28 @@
+{
+  "total": 249,
+  "byAction": {
+    "MANUAL_REVIEW": 93,
+    "RECATEGORY": 110,
+    "KEEP": 14,
+    "REMOVE_CANDIDATE": 32
+  },
+  "byDistrict": {
+    "해운대구": 27,
+    "금정구": 4,
+    "영도구": 18,
+    "동래구": 6,
+    "사하구": 12,
+    "부산진구": 19,
+    "중구": 9,
+    "연제구": 14,
+    "기장군": 54,
+    "사상구": 7,
+    "북구": 13,
+    "동구": 6,
+    "서구": 9,
+    "남구": 9,
+    "강서구": 36,
+    "수영구": 6
+  },
+  "output": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\reports\\facility_validation\\facility_direct_category_review.csv"
+}

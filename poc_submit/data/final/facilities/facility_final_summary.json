@@ -1,0 +1,53 @@
+{
+  "counts": {
+    "places": 13564,
+    "accessibilityFeatures": 42565,
+    "placesWithAccessibility": 12309,
+    "placesWithoutAccessibility": 1255
+  },
+  "categoryCounts": {
+    "ACCOMMODATION": 246,
+    "ETC": 11287,
+    "FOOD_CAFE": 814,
+    "HEALTHCARE": 391,
+    "PUBLIC_OFFICE": 279,
+    "TOURIST_SPOT": 244,
+    "WELFARE": 303
+  },
+  "featureTypeCounts": {
+    "accessibleEntrance": 10050,
+    "accessibleParking": 3787,
+    "accessibleRoom": 124,
+    "accessibleToilet": 3541,
+    "chargingStation": 197,
+    "elevator": 4922,
+    "guidanceFacility": 475,
+    "ramp": 9668,
+    "stepFree": 9801
+  },
+  "districtCounts": {
+    "강서구": 938,
+    "구군미분류": 14,
+    "금정구": 1106,
+    "기장군": 1053,
+    "남구": 1128,
+    "동구": 352,
+    "동래구": 783,
+    "부산진구": 1302,
+    "북구": 693,
+    "사상구": 725,
+    "사하구": 967,
+    "서구": 657,
+    "수영구": 931,
+    "연제구": 908,
+    "영도구": 484,
+    "중구": 332,
+    "해운대구": 1191
+  },
+  "sourceDatasetCounts": {
+    "erd_ready": 13564
+  },
+  "validationStatus": "PASS",
+  "qualityWarningCount": 0,
+  "policy": "ERD_v3_2026-04-28"
+}

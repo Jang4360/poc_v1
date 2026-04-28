@@ -1,0 +1,13 @@
+{
+  "alreadyApplied": true,
+  "checkedAt": "2026-04-28T02:38:04.738653",
+  "placesAfter": 3457,
+  "missingSourceKeys": [
+    "barrier_free_facility:12835",
+    "barrier_free_facility:3332",
+    "barrier_free_facility:6432",
+    "barrier_free_facility:9365",
+    "barrier_free_facility:9634"
+  ],
+  "removedAppliedReport": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\reports\\facility_validation\\facility_non_destination_remove_rule_removed_applied.csv"
+}

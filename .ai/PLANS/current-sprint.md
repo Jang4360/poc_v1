@@ -138,3 +138,18 @@ Planning guard for real service: all downstream ETL, GraphHopper import, and ver
 - [ ] `poc/build.gradle`에 Hibernate Spatial이 없으므로 GEOMETRY 컬럼을 JPA 엔티티로 매핑하려면 의존성 추가가 필수다.
 - [ ] PostGIS와 GH 컨테이너 설정은 현재 저장소의 `docker-compose.yml`을 기준으로 검증한다.
 - [ ] GraphHopper custom encoded value는 Java SPI 플러그인을 별도 모듈(`graphhopper-plugin/`)로 작성해야 한다. 이 모듈은 현재 `poc/`에 없다.
+
+## Implementation Notes
+
+- [x] 2026-04-28: `pedestrian_road_extraction_criteria_v2.md`의 도로면 boundary 방식에 맞춰 강서구 v4 편집 산출물을 추가했다.
+  - Outputs: `etl/gangseo_road_boundary_v4.geojson`, `etl/gangseo_road_boundary_v4.html`, `etl/gangseo_road_nodes_v4.csv`, `etl/gangseo_road_segments_v4.csv`.
+  - CSV adapter rule: v2 GeoJSON source keeps `roadNodes` empty, then `etl/scripts/17_export_road_boundary_csv.py` creates endpoint nodes only for the manual edit UI contract.
+  - UI: `etl/noksan_sinho_songjeong_hwajeon_segment_02c_graph_edit.html` now exposes a district selector, loads the Gangseo node/segment payload, and keeps Add/Delete node/segment plus Undo, Save JSON, Edit CSV, Copy JSON, Clear controls.
+  - Correction: the full Gangseo payload made the editor too heavy on initial page load, so the editor now ships a lightweight Gangseo base shell and fetches only the selected 동 subset from `/api/segment-02c/payload?dong=...`. Available default selector values are `명지동`, `신호동`, `녹산동`, `화전동`; the default is `신호동`.
+  - Editor correction: manual add/undo/clear now redraws only the current viewport instead of fitting all features again, so the map zoom and pan stay in place while the side-panel edit list grows. The new-segment type selector is limited to `SIDE_LINE` and `SIDE_WALK`; existing `ROAD_BOUNDARY`/`ROAD_BOUNDARY_INNER` source segments still render normally.
+  - Sinho preview: `etl/scripts/19_generate_sinho_corner_node_preview.py` creates a read-only 신호동 result HTML that promotes endpoints and visible corner vertices to nodes, then splits source road-boundary lines at those nodes. This preview does not overwrite the v4 CSVs.
+  - Gangseo v5: `etl/scripts/20_generate_gangseo_corner_split_v5_csv.py` regenerates Gangseo CSVs as `gangseo_road_nodes_v5.csv` and `gangseo_road_segments_v5.csv` by applying the same corner-node split rule to the full v4 road-boundary graph. The edit server now defaults to v5 CSVs.
+  - Editor correction: delete mode now exposes `Drag` and `Delete all` controls beside `Reload bbox`; clicking exactly 4 polygon vertices records delete edits for all segments intersecting the polygon and all nodes inside the polygon before the user applies them with `Edit CSV`.
+  - Editor coverage: the Gangseo selector now includes the full v5 CSV extent plus additional Gangseo bbox work areas beyond the original four: 송정동, 미음동, 지사동, 생곡동, 범방동, 구랑동, 가락동, 강동동, 대저1동, 대저2동, 공항동, 가덕도동.
+  - Validation: `python -m pytest etl/tests/test_segment_centerline_02c.py etl/tests/test_segment_graph_edit_ui.py etl/tests/test_road_boundary_csv_export.py etl/tests/test_district_road_boundary_from_polygons.py -q` passed; `scripts/verify.sh` passed.
+  - Accepted risk: direct full-radius `etl.scripts.13_generate_segment_02c_centerline --variant road-boundary` for Gangseo timed out in the large union stage, so v4 generation used the prepared `poc_submit` Gangseo road-polygon asset as the road-surface input before union and boundary extraction. Retry was recorded as `gangseo-road-boundary-v2-radius-18000-union-timeout`.

@@ -8,14 +8,25 @@ from typing import Any
 from etl.common.subway_elevator_preview import KAKAO_JAVASCRIPT_KEY, SEGMENT_STYLES
 
 
-def render_html(payload: dict[str, Any]) -> str:
+def render_html(
+    payload: dict[str, Any],
+    *,
+    lazy_payload_endpoint: str | None = None,
+    dong_areas: list[dict[str, Any]] | None = None,
+    default_dong_id: str | None = None,
+) -> str:
     meta = payload["meta"]
     summary = payload["summary"]
-    payload_json = json.dumps(payload, ensure_ascii=False)
+    district_name = str(meta.get("districtGu") or meta.get("district") or "강서구")
+    district_payloads = {} if lazy_payload_endpoint else {district_name: payload}
+    district_payloads_json = json.dumps(district_payloads, ensure_ascii=False)
+    lazy_payload_endpoint_json = json.dumps(lazy_payload_endpoint or "", ensure_ascii=False)
+    dong_areas_json = json.dumps(dong_areas or [], ensure_ascii=False)
+    default_area_id_json = json.dumps(default_dong_id or district_name, ensure_ascii=False)
     segment_styles_json = json.dumps(SEGMENT_STYLES, ensure_ascii=False)
     kakao_javascript_key = html.escape(KAKAO_JAVASCRIPT_KEY)
-    type_text = ", ".join(f"{item['name']} {item['count']}" for item in summary["segmentTypeCounts"]) or "-"
-    source_name = html.escape(Path(meta.get("outputGeojson", "segment_02c_graph_materialized.geojson")).name)
+    initial_center_lat = float(meta.get("centerLat") or 35.095)
+    initial_center_lon = float(meta.get("centerLon") or 128.872)
     return f"""<!doctype html>
 <html lang="ko">
 <head>
@@ -25,6 +36,15 @@ def render_html(payload: dict[str, Any]) -> str:
   <style>
     * {{
       box-sizing: border-box;
+    }}
+    .toolbar .danger {{
+      border-color: #dc2626;
+      color: #b91c1c;
+    }}
+    .toolbar .danger.active {{
+      background: #dc2626;
+      border-color: #dc2626;
+      color: #ffffff;
     }}
     html, body, #map {{
       width: 100%;
@@ -163,6 +183,7 @@ def render_html(payload: dict[str, Any]) -> str:
 <body>
   <div id="map"></div>
   <div class="toolbar">
+    <select id="district-select" aria-label="동 선택"></select>
     <button id="mode-pan" class="active" type="button">Select</button>
     <button id="mode-delete" type="button">Delete</button>
     <button id="mode-add" type="button">Add</button>
@@ -175,21 +196,23 @@ def render_html(payload: dict[str, Any]) -> str:
       <option value="SIDE_WALK">SIDE_WALK</option>
     </select>
     <button id="reload-bbox" type="button">Reload bbox</button>
+    <button id="box-delete-drag" class="danger hidden" type="button">Drag</button>
+    <button id="box-delete-apply" class="danger hidden" type="button">Delete all</button>
     <span id="visible-stat" class="stat">visible -</span>
   </div>
   <aside class="side-panel">
     <div class="panel-header">
-      <h1>{html.escape(meta['title'])}</h1>
-      <p>source: {source_name}</p>
-      <p>nodes {summary['nodeCount']}, segments {summary['segmentCount']}</p>
-      <p>types: {html.escape(type_text)}</p>
+      <h1 id="panel-title">{html.escape(meta['title'])}</h1>
+      <p id="panel-source">source: -</p>
+      <p id="panel-counts">nodes -, segments -</p>
+      <p id="panel-types">types: -</p>
     </div>
     <div class="panel-actions">
-      <button id="copy-edits" type="button">Copy JSON</button>
-      <button id="save-edits" type="button">Save JSON</button>
-      <button id="update-csv" class="wide" type="button">Update CSV</button>
       <button id="undo-edit" type="button">Undo</button>
-      <button id="reset-edits" type="button">Reset</button>
+      <button id="save-edits" type="button">Save JSON</button>
+      <button id="update-csv" type="button">Edit CSV</button>
+      <button id="copy-edits" type="button">Copy JSON</button>
+      <button id="clear-edits" class="wide" type="button">Clear</button>
     </div>
     <div id="edits" class="edits"></div>
     <textarea id="edits-json" spellcheck="false" readonly></textarea>
@@ -197,9 +220,15 @@ def render_html(payload: dict[str, Any]) -> str:
   <div id="toast" class="toast hidden"></div>
   <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_javascript_key}"></script>
   <script>
-    const payload = {payload_json};
+    const districtPayloads = {district_payloads_json};
+    const lazyPayloadEndpoint = {lazy_payload_endpoint_json};
+    const dongAreas = {dong_areas_json};
+    const defaultAreaId = {default_area_id_json};
+    let activeAreaId = defaultAreaId;
+    let activeDistrict = "";
+    let payload = districtPayloads[Object.keys(districtPayloads)[0]] || null;
     const segmentStyles = {segment_styles_json};
-    const storageKey = `segment_02c_manual_edits_v3:${{payload.meta.outputGeojson}}`;
+    const addableSegmentTypes = ["SIDE_LINE", "SIDE_WALK"];
     const sourceVersion = "02c_graph_materialized";
     const nodeSnapRadiusMeter = 1.0;
     let mode = "pan";
@@ -207,15 +236,26 @@ def render_html(payload: dict[str, Any]) -> str:
     let overlays = [];
     let selectedStart = null;
     let addPreviewMarkers = [];
-    let manualEdits = loadEdits();
+    let manualEdits = [];
+    let boxDeleteEnabled = false;
+    let selectionPoints = [];
+    let selectionShape = null;
+    let selectionVertexMarkers = [];
 
     const mapEl = document.getElementById("map");
     const visibleStat = document.getElementById("visible-stat");
     const editsEl = document.getElementById("edits");
     const editsJsonEl = document.getElementById("edits-json");
     const toastEl = document.getElementById("toast");
+    const districtSelectEl = document.getElementById("district-select");
     const targetTypeEl = document.getElementById("target-type");
     const segmentTypeEl = document.getElementById("segment-type");
+    const boxDeleteDragEl = document.getElementById("box-delete-drag");
+    const boxDeleteApplyEl = document.getElementById("box-delete-apply");
+    const panelTitleEl = document.getElementById("panel-title");
+    const panelSourceEl = document.getElementById("panel-source");
+    const panelCountsEl = document.getElementById("panel-counts");
+    const panelTypesEl = document.getElementById("panel-types");
 
     function showToast(message) {{
       toastEl.textContent = message;
@@ -224,9 +264,75 @@ def render_html(payload: dict[str, Any]) -> str:
       showToast.timer = window.setTimeout(() => toastEl.classList.add("hidden"), 1800);
     }}
 
+    function updateDeleteBoxControls() {{
+      const show = mode === "delete";
+      boxDeleteDragEl.classList.toggle("hidden", !show);
+      boxDeleteApplyEl.classList.toggle("hidden", !show || selectionPoints.length !== 4);
+      boxDeleteDragEl.classList.toggle("active", boxDeleteEnabled);
+    }}
+
+    function clearSelectionPolygon() {{
+      selectionPoints = [];
+      if (selectionShape) {{
+        selectionShape.setMap(null);
+        selectionShape = null;
+      }}
+      selectionVertexMarkers.forEach(marker => marker.setMap(null));
+      selectionVertexMarkers = [];
+      updateDeleteBoxControls();
+    }}
+
+    function setBoxDeleteEnabled(enabled) {{
+      boxDeleteEnabled = enabled;
+      if (!enabled) clearSelectionPolygon();
+      updateDeleteBoxControls();
+    }}
+
+    function storageKey() {{
+      return `segment_02c_manual_edits_v3:${{payload?.meta?.outputGeojson || "pending"}}:${{activeAreaId}}`;
+    }}
+
+    function escapeText(value) {{
+      return String(value ?? "");
+    }}
+
+    function renderPanelHeader() {{
+      if (!payload) {{
+        panelTitleEl.textContent = "Graph Manual Edit UI";
+        panelSourceEl.textContent = "source: loading";
+        panelCountsEl.textContent = "nodes -, segments -";
+        panelTypesEl.textContent = "types: -";
+        return;
+      }}
+      const summary = payload.summary || {{}};
+      const typeText = (summary.segmentTypeCounts || [])
+        .map(item => `${{item.name}} ${{item.count}}`)
+        .join(", ") || "-";
+      const sourceName = (payload.meta.outputGeojson || "segment_02c_graph_materialized.geojson").split("/").pop();
+      panelTitleEl.textContent = payload.meta.title || "Graph Manual Edit UI";
+      panelSourceEl.textContent = `source: ${{sourceName}}`;
+      panelCountsEl.textContent = `nodes ${{summary.nodeCount || 0}}, segments ${{summary.segmentCount || 0}}`;
+      panelTypesEl.textContent = `types: ${{typeText}}`;
+      const selected = segmentTypeEl.value;
+      segmentTypeEl.innerHTML = addableSegmentTypes
+        .map(type => `<option value="${{escapeText(type)}}">${{escapeText(type)}}</option>`)
+        .join("");
+      segmentTypeEl.value = addableSegmentTypes.includes(selected) ? selected : addableSegmentTypes[0];
+    }}
+
+    function renderDistrictOptions() {{
+      const options = dongAreas.length
+        ? dongAreas
+        : Object.keys(districtPayloads).map(district => ({{ id: district, name: district }}));
+      districtSelectEl.innerHTML = options
+        .map(area => `<option value="${{escapeText(area.id)}}">${{escapeText(area.name)}}</option>`)
+        .join("");
+      districtSelectEl.value = activeAreaId;
+    }}
+
     function loadEdits() {{
       try {{
-        const stored = localStorage.getItem(storageKey);
+        const stored = localStorage.getItem(storageKey());
         return stored ? JSON.parse(stored) : [];
       }} catch (_error) {{
         return [];
@@ -234,18 +340,84 @@ def render_html(payload: dict[str, Any]) -> str:
     }}
 
     function persistEdits() {{
-      localStorage.setItem(storageKey, JSON.stringify(manualEdits));
+      if (!payload) return;
+      localStorage.setItem(storageKey(), JSON.stringify(manualEdits));
       renderEdits();
     }}
 
     function editDocument() {{
+      if (!payload) {{
+        return {{
+          version: sourceVersion,
+          districtGu: activeDistrict,
+          dongId: activeAreaId,
+          districtDong: areaName(activeAreaId),
+          sourceHtml: "",
+          sourceGeojson: "",
+          createdAt: new Date().toISOString(),
+          edits: manualEdits
+        }};
+      }}
       return {{
         version: sourceVersion,
+        districtGu: activeDistrict,
+        dongId: activeAreaId,
+        districtDong: payload.meta.districtDong || areaName(activeAreaId),
         sourceHtml: payload.meta.outputHtml,
         sourceGeojson: payload.meta.outputGeojson,
         createdAt: new Date().toISOString(),
         edits: manualEdits
       }};
+    }}
+
+    function areaName(areaId) {{
+      const area = dongAreas.find(item => item.id === areaId);
+      return area ? area.name : areaId;
+    }}
+
+    async function loadPayloadForArea(areaId) {{
+      if (!lazyPayloadEndpoint) {{
+        return districtPayloads[areaId] || Object.values(districtPayloads)[0] || null;
+      }}
+      const url = new URL(lazyPayloadEndpoint, window.location.origin);
+      url.searchParams.set("dong", areaId);
+      const response = await fetch(url.toString());
+      const result = await response.json();
+      if (!response.ok || !result.ok) {{
+        throw new Error(result.error || `HTTP ${{response.status}}`);
+      }}
+      return result.payload;
+    }}
+
+    async function switchDistrict(nextAreaId) {{
+      activeAreaId = nextAreaId;
+      activeDistrict = areaName(nextAreaId);
+      payload = null;
+      clearOverlays();
+      clearSelectionPolygon();
+      setBoxDeleteEnabled(false);
+      renderPanelHeader();
+      renderEdits();
+      visibleStat.textContent = "loading...";
+      try {{
+        payload = await loadPayloadForArea(nextAreaId);
+      }} catch (error) {{
+        showToast(`동 데이터를 불러오지 못했습니다: ${{error.message}}`);
+        visibleStat.textContent = "load failed";
+        return;
+      }}
+      activeDistrict = payload.meta.districtGu || activeDistrict;
+      manualEdits = loadEdits();
+      selectedStart = null;
+      addPreviewMarkers.forEach(marker => marker.setMap(null));
+      addPreviewMarkers = [];
+      renderPanelHeader();
+      renderEdits();
+      if (map) {{
+        map.setCenter(new kakao.maps.LatLng(payload.meta.centerLat, payload.meta.centerLon));
+        renderAllFeaturesAndFit();
+      }}
+      showToast(`${{payload.meta.districtDong || areaName(activeAreaId)}} loaded`);
     }}
 
     function geometryPoint(coord) {{
@@ -289,6 +461,7 @@ def render_html(payload: dict[str, Any]) -> str:
     }}
 
     function activeNodeFeatures() {{
+      if (!payload) return [];
       const hiddenNodes = deletedNodeIds();
       const existing = payload.layers.roadNodes.features.filter(feature => !hiddenNodes.has(feature.properties.vertexId));
       const added = manualEdits
@@ -348,12 +521,17 @@ def render_html(payload: dict[str, Any]) -> str:
       selectedStart = null;
       addPreviewMarkers.forEach(marker => marker.setMap(null));
       addPreviewMarkers = [];
+      if (mode !== "delete") {{
+        clearSelectionPolygon();
+        setBoxDeleteEnabled(false);
+      }}
       ["pan", "delete", "add"].forEach(name => {{
         document.getElementById(`mode-${{name}}`).classList.toggle("active", mode === name);
       }});
       if (mode === "delete") showToast(`Click a ${{targetTypeEl.value}} to delete`);
       else if (mode === "add") showToast(targetTypeEl.value === "node" ? "Click the map to add a node" : "Click two map points to add a segment");
       else showToast("Select mode");
+      updateDeleteBoxControls();
     }}
 
     function deletedSegmentIds() {{
@@ -383,6 +561,128 @@ def render_html(payload: dict[str, Any]) -> str:
       return coords.some(coord => pointInBox(coord, box));
     }}
 
+    function normalizeBox(left, right) {{
+      return {{
+        minLng: Math.min(left[0], right[0]),
+        minLat: Math.min(left[1], right[1]),
+        maxLng: Math.max(left[0], right[0]),
+        maxLat: Math.max(left[1], right[1])
+      }};
+    }}
+
+    function boxToBounds(box) {{
+      const sw = new kakao.maps.LatLng(box.minLat, box.minLng);
+      const ne = new kakao.maps.LatLng(box.maxLat, box.maxLng);
+      return new kakao.maps.LatLngBounds(sw, ne);
+    }}
+
+    function drawSelectionPolygon() {{
+      if (selectionShape) {{
+        selectionShape.setMap(null);
+        selectionShape = null;
+      }}
+      selectionVertexMarkers.forEach(marker => marker.setMap(null));
+      selectionVertexMarkers = [];
+      selectionPoints.forEach((coord, index) => {{
+        const marker = new kakao.maps.Circle({{
+          map,
+          center: latLngFromCoord(coord),
+          radius: 2.1,
+          strokeWeight: 2,
+          strokeColor: "#dc2626",
+          strokeOpacity: 1,
+          fillColor: "#ffffff",
+          fillOpacity: 0.95,
+          zIndex: 31
+        }});
+        selectionVertexMarkers.push(marker);
+      }});
+      const path = selectionPoints.map(latLngFromCoord);
+      if (selectionPoints.length === 4) {{
+        selectionShape = new kakao.maps.Polygon({{
+          map,
+          path,
+          strokeWeight: 2,
+          strokeColor: "#dc2626",
+          strokeOpacity: 0.95,
+          strokeStyle: "solid",
+          fillColor: "#ef4444",
+          fillOpacity: 0.13,
+          zIndex: 30
+        }});
+      }} else if (selectionPoints.length >= 2) {{
+        selectionShape = new kakao.maps.Polyline({{
+          map,
+          path,
+          strokeWeight: 2,
+          strokeColor: "#dc2626",
+          strokeOpacity: 0.95,
+          strokeStyle: "solid",
+          zIndex: 30
+        }});
+      }}
+      updateDeleteBoxControls();
+    }}
+
+    function addSelectionPoint(coord) {{
+      if (selectionPoints.length >= 4) {{
+        showToast("4 points selected; press Delete all or toggle Drag to redraw");
+        return;
+      }}
+      selectionPoints.push(coord);
+      drawSelectionPolygon();
+      showToast(selectionPoints.length < 4 ? `${{selectionPoints.length}}/4 points selected` : "4/4 points selected; Delete all applies polygon");
+    }}
+
+    function lineSegmentsIntersect(a, b, c, d) {{
+      function direction(p, q, r) {{
+        return (r[0] - p[0]) * (q[1] - p[1]) - (q[0] - p[0]) * (r[1] - p[1]);
+      }}
+      function onSegment(p, q, r) {{
+        return (
+          Math.min(p[0], r[0]) <= q[0] && q[0] <= Math.max(p[0], r[0]) &&
+          Math.min(p[1], r[1]) <= q[1] && q[1] <= Math.max(p[1], r[1])
+        );
+      }}
+      const d1 = direction(c, d, a);
+      const d2 = direction(c, d, b);
+      const d3 = direction(a, b, c);
+      const d4 = direction(a, b, d);
+      if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {{
+        return true;
+      }}
+      if (d1 === 0 && onSegment(c, a, d)) return true;
+      if (d2 === 0 && onSegment(c, b, d)) return true;
+      if (d3 === 0 && onSegment(a, c, b)) return true;
+      if (d4 === 0 && onSegment(a, d, b)) return true;
+      return false;
+    }}
+
+    function pointInPolygon(coord, polygon) {{
+      const [lng, lat] = coord;
+      let inside = false;
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {{
+        const [lngI, latI] = polygon[i];
+        const [lngJ, latJ] = polygon[j];
+        const intersects = ((latI > lat) !== (latJ > lat)) && (lng < (lngJ - lngI) * (lat - latI) / (latJ - latI) + lngI);
+        if (intersects) inside = !inside;
+      }}
+      return inside;
+    }}
+
+    function lineTouchesPolygon(coords, polygon) {{
+      if (coords.some(coord => pointInPolygon(coord, polygon))) return true;
+      const edges = polygon.map((coord, index) => [coord, polygon[(index + 1) % polygon.length]]);
+      for (let index = 1; index < coords.length; index += 1) {{
+        const left = coords[index - 1];
+        const right = coords[index];
+        if (edges.some(([edgeLeft, edgeRight]) => lineSegmentsIntersect(left, right, edgeLeft, edgeRight))) {{
+          return true;
+        }}
+      }}
+      return false;
+    }}
+
     function clearOverlays() {{
       overlays.forEach(overlay => overlay.setMap(null));
       overlays = [];
@@ -401,6 +701,7 @@ def render_html(payload: dict[str, Any]) -> str:
     }}
 
     function incidentSegmentIds(vertexId) {{
+      if (!payload) return [];
       return payload.layers.roadSegments.features
         .filter(feature => feature.properties.fromNodeId === vertexId || feature.properties.toNodeId === vertexId)
         .map(feature => feature.properties.edgeId);
@@ -516,7 +817,7 @@ def render_html(payload: dict[str, Any]) -> str:
 
     function renderVisible() {{
       clearOverlays();
-      if (!map) return;
+      if (!map || !payload) return;
       let box = null;
       try {{
         box = boundsToBox(map.getBounds());
@@ -562,7 +863,7 @@ def render_html(payload: dict[str, Any]) -> str:
     }}
 
     function renderAllFeaturesAndFit() {{
-      if (!map) return;
+      if (!map || !payload) return;
       clearOverlays();
       const hiddenSegments = deletedSegmentIds();
       const hiddenNodes = deletedNodeIds();
@@ -608,6 +909,67 @@ def render_html(payload: dict[str, Any]) -> str:
         map.setBounds(bounds);
       }}
       visibleStat.textContent = `visible segments ${{visibleSegments.length}}, nodes ${{visibleNodes.length}}, edits ${{manualEdits.length}}`;
+    }}
+
+    function deleteFeaturesInSelectionPolygon() {{
+      if (!payload || selectionPoints.length !== 4) {{
+        showToast("Click exactly 4 polygon points first");
+        return;
+      }}
+      const hiddenSegments = deletedSegmentIds();
+      const hiddenNodes = deletedNodeIds();
+      const createdAt = new Date().toISOString();
+      const polygonMeta = selectionPoints.map(coord => [
+        Number(coord[0].toFixed(8)),
+        Number(coord[1].toFixed(8))
+      ]);
+      const segmentEdits = payload.layers.roadSegments.features
+        .filter(feature => !hiddenSegments.has(feature.properties.edgeId))
+        .filter(feature => lineTouchesPolygon(feature.geometry.coordinates, selectionPoints))
+        .map(feature => {{
+          const props = feature.properties;
+          return {{
+            action: "delete_segment",
+            entity: "road_segment",
+            operation: "delete",
+            edgeId: props.edgeId,
+            fromNodeId: props.fromNodeId,
+            toNodeId: props.toNodeId,
+            segmentType: props.segmentType,
+            geom: geometryLine(feature.geometry.coordinates),
+            selectionPolygon: polygonMeta,
+            reason: "manual_polygon_delete",
+            createdAt
+          }};
+        }});
+      const nodeEdits = payload.layers.roadNodes.features
+        .filter(feature => !hiddenNodes.has(feature.properties.vertexId))
+        .filter(feature => pointInPolygon(feature.geometry.coordinates, selectionPoints))
+        .map(feature => {{
+          const props = feature.properties;
+          return {{
+            action: "delete_node",
+            entity: "road_node",
+            operation: "delete",
+            vertexId: props.vertexId,
+            sourceNodeKey: props.sourceNodeKey,
+            geom: geometryPoint(feature.geometry.coordinates),
+            incidentSegmentIds: incidentSegmentIds(props.vertexId),
+            selectionPolygon: polygonMeta,
+            note: "Polygon delete records node removal; CSV apply keeps this node if any remaining road_segment still references it.",
+            reason: "manual_polygon_delete",
+            createdAt
+          }};
+        }});
+      if (!segmentEdits.length && !nodeEdits.length) {{
+        showToast("No node or segment in delete polygon");
+        return;
+      }}
+      manualEdits.push(...segmentEdits, ...nodeEdits);
+      persistEdits();
+      clearSelectionPolygon();
+      renderVisible();
+      showToast(`polygon delete recorded: ${{segmentEdits.length}} segments, ${{nodeEdits.length}} nodes`);
     }}
 
     function saveJsonDocument(editDoc) {{
@@ -661,12 +1023,16 @@ def render_html(payload: dict[str, Any]) -> str:
       mapEl.innerHTML = "<p style='padding:16px'>Kakao Maps SDK failed to load.</p>";
     }} else {{
       map = new kakao.maps.Map(mapEl, {{
-        center: new kakao.maps.LatLng(payload.meta.centerLat, payload.meta.centerLon),
+        center: new kakao.maps.LatLng({initial_center_lat:.7f}, {initial_center_lon:.7f}),
         level: 4
       }});
       kakao.maps.event.addListener(map, "idle", renderVisible);
       kakao.maps.event.addListener(map, "click", event => {{
-        if (mode !== "add") return;
+        if (mode === "delete" && boxDeleteEnabled && payload) {{
+          addSelectionPoint(coordFromLatLng(event.latLng));
+          return;
+        }}
+        if (mode !== "add" || !payload) return;
         const coord = coordFromLatLng(event.latLng);
         if (targetTypeEl.value === "node") {{
           const snapped = snapNode(coord);
@@ -687,7 +1053,7 @@ def render_html(payload: dict[str, Any]) -> str:
           }};
           manualEdits.push(edit);
           persistEdits();
-          renderAllFeaturesAndFit();
+          renderVisible();
           showToast("node add recorded");
           return;
         }}
@@ -728,16 +1094,21 @@ def render_html(payload: dict[str, Any]) -> str:
         addPreviewMarkers.forEach(item => item.setMap(null));
         addPreviewMarkers = [];
         persistEdits();
-        renderAllFeaturesAndFit();
+        renderVisible();
         showToast("segment add recorded");
       }});
-      renderAllFeaturesAndFit();
     }}
 
     document.getElementById("mode-pan").addEventListener("click", () => setMode("pan"));
     document.getElementById("mode-delete").addEventListener("click", () => setMode("delete"));
     document.getElementById("mode-add").addEventListener("click", () => setMode("add"));
     document.getElementById("reload-bbox").addEventListener("click", renderAllFeaturesAndFit);
+    boxDeleteDragEl.addEventListener("click", () => {{
+      if (mode !== "delete") setMode("delete");
+      setBoxDeleteEnabled(!boxDeleteEnabled);
+      showToast(boxDeleteEnabled ? "Click polygon points on the map" : "Polygon delete off");
+    }});
+    boxDeleteApplyEl.addEventListener("click", deleteFeaturesInSelectionPolygon);
     document.getElementById("save-edits").addEventListener("click", () => saveJsonDocument(editDocument()));
     document.getElementById("update-csv").addEventListener("click", updateCsv);
     document.getElementById("copy-edits").addEventListener("click", async () => {{
@@ -747,22 +1118,28 @@ def render_html(payload: dict[str, Any]) -> str:
     document.getElementById("undo-edit").addEventListener("click", () => {{
       manualEdits.pop();
       persistEdits();
-      renderAllFeaturesAndFit();
+      renderVisible();
       showToast("last edit removed");
     }});
-    document.getElementById("reset-edits").addEventListener("click", () => {{
+    document.getElementById("clear-edits").addEventListener("click", () => {{
       manualEdits = [];
       persistEdits();
-      renderAllFeaturesAndFit();
+      renderVisible();
       showToast("manual_edits cleared");
     }});
+    districtSelectEl.addEventListener("change", event => switchDistrict(event.target.value));
     targetTypeEl.addEventListener("change", () => {{
       selectedStart = null;
       addPreviewMarkers.forEach(marker => marker.setMap(null));
       addPreviewMarkers = [];
       showToast(`target: ${{targetTypeEl.value}}`);
     }});
+    renderDistrictOptions();
+    renderPanelHeader();
     renderEdits();
+    if (districtSelectEl.value) {{
+      switchDistrict(districtSelectEl.value);
+    }}
   </script>
 </body>
 </html>

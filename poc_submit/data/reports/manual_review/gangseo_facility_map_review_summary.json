@@ -1,0 +1,35 @@
+{
+  "district": "강서구",
+  "targetType": "facility",
+  "sourceAdoptedCsv": "C:\\Users\\SSAFY\\Desktop\\poc_submit\\data\\adopted\\adopted_places_with_accessibility.csv",
+  "sourceValidationCsv": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\reports\\facility_validation\\facility_kakao_poi_existence_rule_all.csv",
+  "outputCsv": "C:\\Users\\SSAFY\\Desktop\\poc_submit\\data\\reports\\manual_review\\gangseo_facility_map_review_decisions.csv",
+  "outputSeedJs": "C:\\Users\\SSAFY\\Desktop\\poc_submit\\assets\\data\\manual-review-seed-data.js",
+  "total": 279,
+  "byStatus": {
+    "KEEP": 268,
+    "REMOVE": 1,
+    "REVIEW": 10
+  },
+  "byCategory": {
+    "ACCOMMODATION": 15,
+    "CHARGING_STATION": 6,
+    "HEALTHCARE": 8,
+    "PUBLIC_OFFICE": 21,
+    "RESTAURANT": 60,
+    "TOILET": 142,
+    "TOURIST_SPOT": 5,
+    "WELFARE": 22
+  },
+  "byEvidenceAction": {
+    "RENAME_REVIEW": 71,
+    "KEEP": 86,
+    "CATEGORY_REVIEW": 63,
+    "POI_ONLY_RECHECK": 36,
+    "POI_ONLY_CATEGORY_RECHECK": 16,
+    "MANUAL_REVIEW": 5,
+    "REMOVE_REVIEW": 1,
+    "REVIEW_OR_REMOVE": 1
+  },
+  "updatedAt": "2026-04-27T08:19:05.747867+00:00"
+}

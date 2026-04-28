@@ -1,0 +1,180 @@
+{
+  "inputs": [
+    "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_candidates_keep_review.csv",
+    "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_candidates_residential_manual_review.csv",
+    "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_candidates_p4_manual_review.csv"
+  ],
+  "outputs": {
+    "all": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_first_pass_decisions.csv",
+    "likelyAdopt": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_first_pass_likely_adopt.csv",
+    "likelyExclude": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_first_pass_likely_exclude.csv",
+    "manualReview": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_first_pass_manual_review.csv"
+  },
+  "counts": {
+    "total": 2617,
+    "likelyAdopt": 876,
+    "likelyExclude": 208,
+    "manualReview": 1533
+  },
+  "decisionCounts": {
+    "LIKELY_ADOPT": 876,
+    "MANUAL_REVIEW": 1533,
+    "LIKELY_EXCLUDE": 208
+  },
+  "decisionByWorkset": {
+    "KEEP_REVIEW": {
+      "LIKELY_ADOPT": 876,
+      "MANUAL_REVIEW": 603
+    },
+    "P4_MANUAL_REVIEW": {
+      "MANUAL_REVIEW": 662,
+      "LIKELY_EXCLUDE": 114
+    },
+    "RESIDENTIAL_MANUAL_REVIEW": {
+      "MANUAL_REVIEW": 268,
+      "LIKELY_EXCLUDE": 94
+    }
+  },
+  "decisionByPriority": {
+    "P1": {
+      "LIKELY_ADOPT": 647,
+      "MANUAL_REVIEW": 50
+    },
+    "P2": {
+      "LIKELY_ADOPT": 106,
+      "MANUAL_REVIEW": 25
+    },
+    "P3": {
+      "MANUAL_REVIEW": 655,
+      "LIKELY_ADOPT": 123
+    },
+    "P4": {
+      "MANUAL_REVIEW": 803,
+      "LIKELY_EXCLUDE": 208
+    }
+  },
+  "reasonCodeCounts": {
+    "p1_road_with_crosswalk_or_public_context": 260,
+    "p1_generic_road_connected": 357,
+    "p1_generic_road_with_facility_context": 30,
+    "p2_road_with_crosswalk_or_public_context": 78,
+    "p2_needs_context_check": 18,
+    "p2_generic_road_with_facility_context": 28,
+    "p3_no_nearby_crosswalk_or_facility": 459,
+    "p3_close_road_with_public_context": 123,
+    "p3_close_road_generic_needs_visual_check": 107,
+    "p1_named_place_needs_context_check": 19,
+    "residential_may_be_private_or_through_path": 268,
+    "residential_p4_gt_50m_no_public_context": 54,
+    "residential_gt_100m_no_nearby_public_clue": 40,
+    "p4_needs_map_check_before_adoption": 662,
+    "p4_low_connectivity_no_public_context": 113,
+    "p4_gt_100m_no_nearby_public_clue": 1
+  },
+  "reasonCodeByDecision": {
+    "LIKELY_ADOPT": {
+      "p1_road_with_crosswalk_or_public_context": 260,
+      "p1_generic_road_connected": 357,
+      "p1_generic_road_with_facility_context": 30,
+      "p2_road_with_crosswalk_or_public_context": 78,
+      "p2_generic_road_with_facility_context": 28,
+      "p3_close_road_with_public_context": 123
+    },
+    "LIKELY_EXCLUDE": {
+      "residential_p4_gt_50m_no_public_context": 54,
+      "residential_gt_100m_no_nearby_public_clue": 40,
+      "p4_low_connectivity_no_public_context": 113,
+      "p4_gt_100m_no_nearby_public_clue": 1
+    },
+    "MANUAL_REVIEW": {
+      "p2_needs_context_check": 18,
+      "p3_no_nearby_crosswalk_or_facility": 459,
+      "p3_close_road_generic_needs_visual_check": 107,
+      "p1_named_place_needs_context_check": 19,
+      "residential_may_be_private_or_through_path": 268,
+      "p4_needs_map_check_before_adoption": 662
+    }
+  },
+  "districtDecisionCounts": {
+    "강서구": {
+      "LIKELY_ADOPT": 135,
+      "MANUAL_REVIEW": 207,
+      "LIKELY_EXCLUDE": 17
+    },
+    "금정구": {
+      "LIKELY_ADOPT": 54,
+      "MANUAL_REVIEW": 78,
+      "LIKELY_EXCLUDE": 24
+    },
+    "기장군": {
+      "LIKELY_ADOPT": 82,
+      "MANUAL_REVIEW": 183,
+      "LIKELY_EXCLUDE": 30
+    },
+    "남구": {
+      "LIKELY_ADOPT": 30,
+      "MANUAL_REVIEW": 43,
+      "LIKELY_EXCLUDE": 6
+    },
+    "동구": {
+      "LIKELY_ADOPT": 35,
+      "MANUAL_REVIEW": 47
+    },
+    "동래구": {
+      "LIKELY_ADOPT": 20,
+      "MANUAL_REVIEW": 77,
+      "LIKELY_EXCLUDE": 7
+    },
+    "부산진구": {
+      "LIKELY_ADOPT": 39,
+      "MANUAL_REVIEW": 93,
+      "LIKELY_EXCLUDE": 13
+    },
+    "북구": {
+      "LIKELY_ADOPT": 55,
+      "MANUAL_REVIEW": 109,
+      "LIKELY_EXCLUDE": 15
+    },
+    "사상구": {
+      "LIKELY_ADOPT": 181,
+      "MANUAL_REVIEW": 288,
+      "LIKELY_EXCLUDE": 76
+    },
+    "사하구": {
+      "LIKELY_ADOPT": 46,
+      "MANUAL_REVIEW": 75,
+      "LIKELY_EXCLUDE": 3
+    },
+    "서구": {
+      "LIKELY_ADOPT": 33,
+      "MANUAL_REVIEW": 31,
+      "LIKELY_EXCLUDE": 1
+    },
+    "수영구": {
+      "LIKELY_ADOPT": 17,
+      "MANUAL_REVIEW": 22,
+      "LIKELY_EXCLUDE": 3
+    },
+    "연제구": {
+      "LIKELY_ADOPT": 23,
+      "MANUAL_REVIEW": 36,
+      "LIKELY_EXCLUDE": 3
+    },
+    "영도구": {
+      "LIKELY_ADOPT": 32,
+      "MANUAL_REVIEW": 55,
+      "LIKELY_EXCLUDE": 2
+    },
+    "중구": {
+      "LIKELY_ADOPT": 28,
+      "MANUAL_REVIEW": 79,
+      "LIKELY_EXCLUDE": 1
+    },
+    "해운대구": {
+      "LIKELY_ADOPT": 66,
+      "MANUAL_REVIEW": 110,
+      "LIKELY_EXCLUDE": 7
+    }
+  },
+  "note": "LIKELY_* is a first-pass data decision, not final confirmation. MANUAL_REVIEW remains the visual review target."
+}

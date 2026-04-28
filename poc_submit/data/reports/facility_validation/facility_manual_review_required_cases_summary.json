@@ -1,0 +1,59 @@
+{
+  "generatedAt": "2026-04-28T02:48:34.378737",
+  "total": 1665,
+  "byReasonCode": {
+    "GENERIC_NAME": 1665
+  },
+  "byEvidenceAction": {
+    "POI_ONLY_RECHECK": 127,
+    "KAKAO_RENAME_APPLIED": 524,
+    "KEEP": 807,
+    "POLICY_CATEGORY_DECIDED": 207
+  },
+  "byStatus": {
+    "KEEP": 1665
+  },
+  "byDbCategory": {
+    "TOILET": 433,
+    "ACCOMMODATION": 226,
+    "ETC": 65,
+    "HEALTHCARE": 250,
+    "PUBLIC_OFFICE": 3,
+    "RESTAURANT": 468,
+    "WELFARE": 220
+  },
+  "byUiCategory": {
+    "공중화장실": 433,
+    "숙박": 226,
+    "기타 편의시설": 65,
+    "의료·보건": 250,
+    "공공기관": 3,
+    "음식·카페": 468,
+    "복지·돌봄": 220
+  },
+  "byCoordinateQuality": {
+    "CHECK": 133,
+    "GOOD": 1505,
+    "BAD": 27
+  },
+  "byDistrictGu": {
+    "": 1,
+    "강서구": 162,
+    "금정구": 97,
+    "기장군": 249,
+    "남구": 95,
+    "동구": 41,
+    "동래구": 73,
+    "부산진구": 118,
+    "북구": 105,
+    "사상구": 101,
+    "사하구": 45,
+    "서구": 47,
+    "수영구": 59,
+    "연제구": 67,
+    "영도구": 68,
+    "중구": 48,
+    "해운대구": 289
+  },
+  "outputCsv": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\reports\\facility_validation\\facility_manual_review_required_cases.csv"
+}

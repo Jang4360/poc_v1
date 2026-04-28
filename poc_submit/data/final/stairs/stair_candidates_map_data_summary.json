@@ -1,0 +1,34 @@
+{
+  "source": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_second_pass_likely_adopt.csv",
+  "geojson": "C:\\Users\\SSAFY\\Desktop\\poc\\data\\final\\stairs\\stair_second_pass_likely_adopt.geojson",
+  "js": "C:\\Users\\SSAFY\\Desktop\\poc\\assets\\data\\busan-stair-review-keep-review-data.js",
+  "total": 1214,
+  "priorityCounts": {
+    "P1": 659,
+    "P2": 108,
+    "P3": 208,
+    "P4": 239
+  },
+  "districtCounts": {
+    "강서구": 168,
+    "금정구": 77,
+    "기장군": 132,
+    "남구": 37,
+    "동구": 52,
+    "동래구": 46,
+    "부산진구": 68,
+    "북구": 72,
+    "사상구": 223,
+    "사하구": 54,
+    "서구": 45,
+    "수영구": 20,
+    "연제구": 34,
+    "영도구": 41,
+    "중구": 53,
+    "해운대구": 92
+  },
+  "decisionCounts": {
+    "LIKELY_ADOPT": 1214
+  },
+  "note": "지도 계단 후보는 자동 2차 판정 LIKELY_ADOPT만 표시한다. JS 파일명은 index.html 호환을 위해 유지한다."
+}

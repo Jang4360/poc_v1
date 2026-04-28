@@ -27,6 +27,97 @@ GEOD = Geod(ellps="GRS80")
 POINT_EWKT_RE = re.compile(r"^SRID=4326;POINT\(([-0-9.]+) ([-0-9.]+)\)$")
 LINESTRING_EWKT_RE = re.compile(r"^SRID=4326;LINESTRING\((.+)\)$")
 SIDE_LINE_ALIASES = {"SIDE_LEFT", "SIDE_RIGHT"}
+DISTRICT_BY_SLUG = {
+    "gangseo": "강서구",
+}
+GANGSEO_DONG_AREAS = [
+    {
+        "id": "gangseo_all",
+        "name": "강서구 전체",
+        "bbox": {"minLon": 128.765, "minLat": 34.993, "maxLon": 128.998, "maxLat": 35.236},
+    },
+    {
+        "id": "myeongji",
+        "name": "명지동",
+        "bbox": {"minLon": 128.895, "minLat": 35.08, "maxLon": 128.94, "maxLat": 35.12},
+    },
+    {
+        "id": "sinho",
+        "name": "신호동",
+        "bbox": {"minLon": 128.858, "minLat": 35.075, "maxLon": 128.895, "maxLat": 35.105},
+    },
+    {
+        "id": "noksan",
+        "name": "녹산동",
+        "bbox": {"minLon": 128.815, "minLat": 35.075, "maxLon": 128.858, "maxLat": 35.135},
+    },
+    {
+        "id": "hwajeon",
+        "name": "화전동",
+        "bbox": {"minLon": 128.858, "minLat": 35.105, "maxLon": 128.895, "maxLat": 35.135},
+    },
+    {
+        "id": "songjeong",
+        "name": "송정동",
+        "bbox": {"minLon": 128.815, "minLat": 35.045, "maxLon": 128.865, "maxLat": 35.085},
+    },
+    {
+        "id": "mium",
+        "name": "미음동",
+        "bbox": {"minLon": 128.835, "minLat": 35.135, "maxLon": 128.895, "maxLat": 35.175},
+    },
+    {
+        "id": "jisa",
+        "name": "지사동",
+        "bbox": {"minLon": 128.83, "minLat": 35.14, "maxLon": 128.895, "maxLat": 35.185},
+    },
+    {
+        "id": "saenggok",
+        "name": "생곡동",
+        "bbox": {"minLon": 128.855, "minLat": 35.125, "maxLon": 128.905, "maxLat": 35.165},
+    },
+    {
+        "id": "beombang",
+        "name": "범방동",
+        "bbox": {"minLon": 128.875, "minLat": 35.12, "maxLon": 128.925, "maxLat": 35.165},
+    },
+    {
+        "id": "gurang",
+        "name": "구랑동",
+        "bbox": {"minLon": 128.835, "minLat": 35.105, "maxLon": 128.875, "maxLat": 35.145},
+    },
+    {
+        "id": "garak",
+        "name": "가락동",
+        "bbox": {"minLon": 128.825, "minLat": 35.175, "maxLon": 128.925, "maxLat": 35.235},
+    },
+    {
+        "id": "gangdong",
+        "name": "강동동",
+        "bbox": {"minLon": 128.895, "minLat": 35.18, "maxLon": 128.965, "maxLat": 35.235},
+    },
+    {
+        "id": "daejeo1",
+        "name": "대저1동",
+        "bbox": {"minLon": 128.94, "minLat": 35.19, "maxLon": 129.005, "maxLat": 35.235},
+    },
+    {
+        "id": "daejeo2",
+        "name": "대저2동",
+        "bbox": {"minLon": 128.9, "minLat": 35.13, "maxLon": 129.005, "maxLat": 35.2},
+    },
+    {
+        "id": "gonghang",
+        "name": "공항동",
+        "bbox": {"minLon": 128.92, "minLat": 35.145, "maxLon": 128.995, "maxLat": 35.2},
+    },
+    {
+        "id": "gadeokdo",
+        "name": "가덕도동",
+        "bbox": {"minLon": 128.765, "minLat": 34.993, "maxLon": 128.855, "maxLat": 35.075},
+    },
+]
+DEFAULT_GANGSEO_DONG_ID = "sinho"
 
 
 def normalize_segment_type(segment_type: Any) -> str:
@@ -34,6 +125,32 @@ def normalize_segment_type(segment_type: Any) -> str:
     if value in SIDE_LINE_ALIASES:
         return "SIDE_LINE"
     return value
+
+
+def infer_district_from_path(path: Path) -> str | None:
+    name = path.name.lower()
+    for slug, district in DISTRICT_BY_SLUG.items():
+        if slug in name:
+            return district
+    return None
+
+
+def gangseo_dong_area(dong_id_or_name: str | None) -> dict[str, Any]:
+    lookup = str(dong_id_or_name or DEFAULT_GANGSEO_DONG_ID)
+    for area in GANGSEO_DONG_AREAS:
+        if lookup in {area["id"], area["name"]}:
+            return area
+    return next(area for area in GANGSEO_DONG_AREAS if area["id"] == DEFAULT_GANGSEO_DONG_ID)
+
+
+def area_bbox_tuple(area: dict[str, Any]) -> tuple[float, float, float, float]:
+    bbox = area["bbox"]
+    return (
+        float(bbox["minLon"]),
+        float(bbox["minLat"]),
+        float(bbox["maxLon"]),
+        float(bbox["maxLat"]),
+    )
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -101,6 +218,25 @@ def feature_in_bbox(feature: dict[str, Any], bbox: tuple[float, float, float, fl
     else:
         return False
     return any(min_lon <= float(lng) <= max_lon and min_lat <= float(lat) <= max_lat for lng, lat in points)
+
+
+def feature_bounds(features: list[dict[str, Any]]) -> tuple[float, float, float, float] | None:
+    min_lon = min_lat = float("inf")
+    max_lon = max_lat = float("-inf")
+    point_count = 0
+    for feature in features:
+        geometry = feature.get("geometry", {})
+        coords = geometry.get("coordinates") or []
+        points = [coords] if geometry.get("type") == "Point" else coords if geometry.get("type") == "LineString" else []
+        for lng, lat in points:
+            min_lon = min(min_lon, float(lng))
+            min_lat = min(min_lat, float(lat))
+            max_lon = max(max_lon, float(lng))
+            max_lat = max(max_lat, float(lat))
+            point_count += 1
+    if point_count == 0:
+        return None
+    return (min_lon, min_lat, max_lon, max_lat)
 
 
 def refresh_summary(payload: dict[str, Any]) -> None:
@@ -347,15 +483,30 @@ def build_csv_payload(
             if int(feature["properties"]["vertexId"]) in visible_node_ids or feature_in_bbox(feature, bbox)
         ]
 
+    payload_bbox = bbox or feature_bounds(segment_features + node_features)
     center_lon = 128.872
     center_lat = 35.095
     if bbox is not None:
         center_lon = (bbox[0] + bbox[2]) / 2
         center_lat = (bbox[1] + bbox[3]) / 2
+    elif payload_bbox is not None:
+        center_lon = (payload_bbox[0] + payload_bbox[2]) / 2
+        center_lat = (payload_bbox[1] + payload_bbox[3]) / 2
+    district = infer_district_from_path(node_csv) or infer_district_from_path(segment_csv)
+    title = "02C CSV-backed Graph Manual Edit UI"
+    manual_edit_rule = (
+        "CSV-backed graph subset; export manual_edits JSON for the next patch cycle"
+    )
+    if district:
+        title = f"{district} CSV-backed Graph Manual Edit UI"
+        manual_edit_rule = (
+            f"CSV-backed {district} graph; export manual_edits JSON for the next patch cycle"
+        )
 
     payload = {
         "meta": {
-            "title": "02C CSV-backed Graph Manual Edit UI",
+            "title": title,
+            "districtGu": district or "",
             "centerLat": round(center_lat, 7),
             "centerLon": round(center_lon, 7),
             "radiusMeter": 0,
@@ -364,10 +515,7 @@ def build_csv_payload(
             "outputGeojson": str(output_geojson),
             "localhostUrl": f"http://127.0.0.1:3000/etl/{output_html.name}",
             "stage": "02c-csv-backed-manual-edit-ui",
-            "manualEditRule": (
-                "CSV-backed subset for Songjeong-dong, Sinho-dong, Noksan-dong, and Hwajeon-dong; "
-                "export manual_edits JSON for the next patch cycle"
-            ),
+            "manualEditRule": manual_edit_rule,
         },
         "summary": {
             "nodeCount": len(node_features),
@@ -386,12 +534,12 @@ def build_csv_payload(
             "roadSegments": {"type": "FeatureCollection", "features": segment_features},
         },
     }
-    if bbox is not None:
+    if payload_bbox is not None:
         payload["meta"]["bbox"] = {
-            "minLon": bbox[0],
-            "minLat": bbox[1],
-            "maxLon": bbox[2],
-            "maxLat": bbox[3],
+            "minLon": payload_bbox[0],
+            "minLat": payload_bbox[1],
+            "maxLon": payload_bbox[2],
+            "maxLat": payload_bbox[3],
         }
     refresh_summary(payload)
     validate_payload(payload)
@@ -687,6 +835,9 @@ def write_csv_edit_outputs(
     output_html: Path = CSV_EDIT_OUTPUT_HTML,
     output_geojson: Path = CSV_EDIT_OUTPUT_GEOJSON,
     bbox: tuple[float, float, float, float] | None = None,
+    lazy_payload_endpoint: str | None = None,
+    dong_areas: list[dict[str, Any]] | None = None,
+    default_dong_id: str | None = None,
 ) -> dict[str, Any]:
     payload = build_csv_payload(
         node_csv=node_csv,
@@ -695,10 +846,28 @@ def write_csv_edit_outputs(
         output_geojson=output_geojson,
         bbox=bbox,
     )
+    if default_dong_id and dong_areas:
+        default_area = gangseo_dong_area(default_dong_id)
+        payload["meta"].update(
+            {
+                "title": f"강서구 {default_area['name']} CSV-backed Graph Manual Edit UI",
+                "districtGu": "강서구",
+                "dongId": default_area["id"],
+                "districtDong": default_area["name"],
+            }
+        )
     output_geojson.parent.mkdir(parents=True, exist_ok=True)
     output_html.parent.mkdir(parents=True, exist_ok=True)
     output_geojson.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    output_html.write_text(segment_graph_edit_ui.render_html(payload), encoding="utf-8")
+    output_html.write_text(
+        segment_graph_edit_ui.render_html(
+            payload,
+            lazy_payload_endpoint=lazy_payload_endpoint,
+            dong_areas=dong_areas,
+            default_dong_id=default_dong_id,
+        ),
+        encoding="utf-8",
+    )
     return payload
 
 
