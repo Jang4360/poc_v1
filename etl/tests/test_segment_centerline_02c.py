@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from shapely.geometry import LineString
+from shapely.ops import unary_union
+
 from etl.common import segment_centerline_02c
 
 
@@ -59,6 +62,70 @@ def test_build_sideline_payload_contains_side_segments_only() -> None:
     assert payload["layers"]["roadNodes"]["features"] == []
     assert segment_types == {"SIDE_LEFT", "SIDE_RIGHT"}
     assert "CENTERLINE" not in segment_types
+
+
+def test_boundary_lines_from_surface_extracts_outer_ring() -> None:
+    surface = unary_union(
+        [
+            LineString([(0.0, 0.0), (20.0, 0.0)]).buffer(3.0, cap_style=2, join_style=2),
+            LineString([(10.0, -10.0), (10.0, 10.0)]).buffer(3.0, cap_style=2, join_style=2),
+        ]
+    )
+
+    boundaries = segment_centerline_02c.boundary_lines_from_surface(surface)
+
+    assert boundaries
+    assert {segment_type for segment_type, _coords in boundaries} == {"ROAD_BOUNDARY"}
+    assert all(len(coords) >= 2 for _segment_type, coords in boundaries)
+
+
+def test_boundary_lines_from_surface_removes_short_perpendicular_caps() -> None:
+    surface = LineString([(0.0, 0.0), (20.0, 0.0)]).buffer(3.0, cap_style=2, join_style=2)
+
+    boundaries = segment_centerline_02c.boundary_lines_from_surface(surface)
+
+    assert len(boundaries) == 2
+    assert all(coords[0][0] != coords[-1][0] for _segment_type, coords in boundaries)
+    assert all(segment_centerline_02c.projected_length_meter(coords) > 10.0 for _segment_type, coords in boundaries)
+
+
+def test_filter_internal_perpendicular_boundaries_removes_centerline_cross_edge() -> None:
+    boundary_lines = [
+        (
+            "ROAD_BOUNDARY",
+            (
+                (0.0, 3.0),
+                (10.0, 3.0),
+                (10.0, -3.0),
+                (20.0, -3.0),
+            ),
+        )
+    ]
+    centerlines = [LineString([(0.0, 0.0), (20.0, 0.0)])]
+
+    filtered, removed_edges = segment_centerline_02c.filter_internal_perpendicular_boundaries(
+        boundary_lines,
+        centerlines,
+    )
+
+    assert removed_edges == 1
+    assert filtered == [
+        ("ROAD_BOUNDARY", ((0.0, 3.0), (10.0, 3.0))),
+        ("ROAD_BOUNDARY", ((10.0, -3.0), (20.0, -3.0))),
+    ]
+
+
+def test_build_road_boundary_payload_contains_boundary_segments_only() -> None:
+    payload = segment_centerline_02c.build_road_boundary_payload(radius_m=250)
+    segment_types = {
+        feature["properties"]["segmentType"]
+        for feature in payload["layers"]["roadSegments"]["features"]
+    }
+
+    assert payload["summary"]["segmentCount"] > 0
+    assert payload["summary"]["nodeCount"] == 0
+    assert payload["meta"]["stage"] == "road-boundary-buffer-union"
+    assert segment_types <= {"ROAD_BOUNDARY", "ROAD_BOUNDARY_INNER"}
 
 
 def test_split_and_prune_at_intersections_removes_short_original_endpoint_tail() -> None:

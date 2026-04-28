@@ -26,6 +26,7 @@ def main() -> int:
             "sideline-intersection-03",
             "graph-materialized",
             "graph-edit",
+            "road-boundary",
             "sideline-centerline-pruned",
         ],
         default="centerline",
@@ -42,6 +43,16 @@ def main() -> int:
         output_geojson = args.output_geojson or segment_centerline_02c.GRAPH_MATERIALIZED_OUTPUT_GEOJSON
         payload = segment_centerline_02c.write_graph_edit_outputs(
             output_html=output_html,
+            center_lat=args.center_lat,
+            center_lon=args.center_lon,
+            radius_m=args.radius_meter,
+        )
+    elif args.variant == "road-boundary":
+        output_html = args.output_html or segment_centerline_02c.ROAD_BOUNDARY_OUTPUT_HTML
+        output_geojson = args.output_geojson or segment_centerline_02c.ROAD_BOUNDARY_OUTPUT_GEOJSON
+        payload = segment_centerline_02c.write_road_boundary_outputs(
+            output_html=output_html,
+            output_geojson=output_geojson,
             center_lat=args.center_lat,
             center_lon=args.center_lon,
             radius_m=args.radius_meter,

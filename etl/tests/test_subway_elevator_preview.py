@@ -60,5 +60,6 @@ def test_render_html_includes_side_graph_layers_and_kakao_link_action() -> None:
     assert "transition connector" in rendered
     assert "gap bridge" in rendered
     assert "corner bridge" in rendered
+    assert "road boundary" in rendered
     assert "autoload=false" in rendered
     assert "kakao.maps.load(initializeMap)" in rendered

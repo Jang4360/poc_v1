@@ -9,9 +9,10 @@ from typing import Any, Iterable
 
 import shapefile
 from pyproj import Geod, Transformer
-from shapely.geometry import GeometryCollection, LineString, MultiLineString, MultiPoint, Point, box
+from shapely.geometry import GeometryCollection, LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon, box
 from shapely.ops import nearest_points
 from shapely.ops import substring
+from shapely.ops import unary_union
 from shapely.strtree import STRtree
 
 from etl.common import segment_graph_edit_ui, subway_elevator_preview
@@ -41,6 +42,8 @@ GRAPH_MATERIALIZED_OUTPUT_GEOJSON = ETL_DIR / "segment_02c_graph_materialized.ge
 GRAPH_EDIT_OUTPUT_HTML = ETL_DIR / "segment_02c_graph_edit.html"
 CENTERLINE_PRUNED_OUTPUT_HTML = ETL_DIR / "segment_02c_sideline_centerline_pruned.html"
 CENTERLINE_PRUNED_OUTPUT_GEOJSON = ETL_DIR / "segment_02c_sideline_centerline_pruned.geojson"
+ROAD_BOUNDARY_OUTPUT_HTML = ETL_DIR / "haeundae_road_boundary.html"
+ROAD_BOUNDARY_OUTPUT_GEOJSON = ETL_DIR / "haeundae_road_boundary.geojson"
 
 DEFAULT_CENTER_LAT = 35.1633200
 DEFAULT_CENTER_LON = 129.1588705
@@ -70,6 +73,18 @@ ENDPOINT_GRAPH_SNAP_RADIUS_M = 1.5
 JUNCTION_CHAIN_PRUNE_FACTOR = 2.0
 JUNCTION_CHAIN_PRUNE_EXTRA_M = 2.0
 JUNCTION_CHAIN_PRUNE_MAX_M = 55.0
+ROAD_BOUNDARY_MIN_HALF_WIDTH_M = 2.5
+ROAD_BOUNDARY_FALLBACK_HALF_WIDTH_M = 4.0
+ROAD_BOUNDARY_SIMPLIFY_M = 0.25
+ROAD_BOUNDARY_EXTERIOR_AREA_MAX_M2 = 60_000.0
+ROAD_BOUNDARY_CAP_MAX_M = 18.0
+ROAD_BOUNDARY_CAP_MIN_ANGLE_DEG = 55.0
+ROAD_BOUNDARY_CAP_MAX_ANGLE_DEG = 125.0
+ROAD_BOUNDARY_CAP_SIDE_ALIGNMENT_DEG = 135.0
+ROAD_BOUNDARY_INTERNAL_CAP_MAX_M = 36.0
+ROAD_BOUNDARY_INTERNAL_CENTERLINE_MAX_M = 16.0
+ROAD_BOUNDARY_INTERNAL_MIN_ANGLE_DEG = 60.0
+ROAD_BOUNDARY_INTERNAL_MAX_ANGLE_DEG = 120.0
 
 
 @dataclass(frozen=True)
@@ -203,6 +218,261 @@ def iter_lines(geometry: object) -> Iterable[LineString]:
     if isinstance(geometry, GeometryCollection):
         for item in geometry.geoms:
             yield from iter_lines(item)
+
+
+def iter_polygons(geometry: object) -> Iterable[Polygon]:
+    if isinstance(geometry, Polygon):
+        if not geometry.is_empty:
+            yield geometry
+        return
+    if isinstance(geometry, MultiPolygon):
+        for item in geometry.geoms:
+            if not item.is_empty:
+                yield item
+        return
+    if isinstance(geometry, GeometryCollection):
+        for item in geometry.geoms:
+            yield from iter_polygons(item)
+
+
+def road_boundary_half_width(road_width_meter: float | None) -> float:
+    if road_width_meter is None or road_width_meter <= 0:
+        return ROAD_BOUNDARY_FALLBACK_HALF_WIDTH_M
+    return max(road_width_meter / 2.0, ROAD_BOUNDARY_MIN_HALF_WIDTH_M)
+
+
+def vector_angle_degree(left: tuple[float, float], right: tuple[float, float]) -> float:
+    left_length = (left[0] * left[0] + left[1] * left[1]) ** 0.5
+    right_length = (right[0] * right[0] + right[1] * right[1]) ** 0.5
+    if left_length <= 0 or right_length <= 0:
+        return 180.0
+    value = max(-1.0, min(1.0, (left[0] * right[0] + left[1] * right[1]) / (left_length * right_length)))
+    return acos(value) * 180.0 / pi
+
+
+def ring_edge_vector(points: list[tuple[float, float]], index: int) -> tuple[float, float]:
+    start = points[index]
+    end = points[(index + 1) % len(points)]
+    return end[0] - start[0], end[1] - start[1]
+
+
+def is_boundary_cap_edge(points: list[tuple[float, float]], index: int) -> bool:
+    current = ring_edge_vector(points, index)
+    current_length = (current[0] * current[0] + current[1] * current[1]) ** 0.5
+    if current_length > ROAD_BOUNDARY_CAP_MAX_M:
+        return False
+    previous = ring_edge_vector(points, (index - 1) % len(points))
+    following = ring_edge_vector(points, (index + 1) % len(points))
+    previous_angle = vector_angle_degree(previous, current)
+    following_angle = vector_angle_degree(current, following)
+    side_alignment = vector_angle_degree(previous, following)
+    return (
+        ROAD_BOUNDARY_CAP_MIN_ANGLE_DEG <= previous_angle <= ROAD_BOUNDARY_CAP_MAX_ANGLE_DEG
+        and ROAD_BOUNDARY_CAP_MIN_ANGLE_DEG <= following_angle <= ROAD_BOUNDARY_CAP_MAX_ANGLE_DEG
+        and side_alignment >= ROAD_BOUNDARY_CAP_SIDE_ALIGNMENT_DEG
+    )
+
+
+def split_boundary_ring(
+    coords: tuple[tuple[float, float], ...],
+    *,
+    remove_caps: bool = True,
+) -> list[tuple[tuple[float, float], ...]]:
+    if len(coords) < 2:
+        return []
+    points = list(coords[:-1] if coords[0] == coords[-1] else coords)
+    if len(points) < 2:
+        return []
+    remove_indexes = {
+        index
+        for index in range(len(points))
+        if remove_caps and is_boundary_cap_edge(points, index)
+    }
+    if not remove_indexes:
+        ring = tuple([*points, points[0]])
+        return [ring] if projected_length_meter(ring) > MIN_LINE_LENGTH_M else []
+
+    keep = [index not in remove_indexes for index in range(len(points))]
+    chains: list[tuple[tuple[float, float], ...]] = []
+    visited: set[int] = set()
+    starts = [
+        index
+        for index, keep_edge in enumerate(keep)
+        if keep_edge and not keep[(index - 1) % len(points)]
+    ]
+    for start in starts:
+        if start in visited:
+            continue
+        chain = [points[start]]
+        index = start
+        while keep[index] and index not in visited:
+            visited.add(index)
+            chain.append(points[(index + 1) % len(points)])
+            index = (index + 1) % len(points)
+        chain_coords = tuple(chain)
+        if len(chain_coords) >= 2 and projected_length_meter(chain_coords) > MIN_LINE_LENGTH_M:
+            chains.append(chain_coords)
+    return chains
+
+
+def line_direction_at_distance(line: LineString, distance_along: float) -> tuple[float, float] | None:
+    coords = list(line.coords)
+    if len(coords) < 2:
+        return None
+    distance_left = max(0.0, min(distance_along, line.length))
+    for left, right in zip(coords, coords[1:]):
+        segment_vector = (float(right[0] - left[0]), float(right[1] - left[1]))
+        segment_length = (segment_vector[0] * segment_vector[0] + segment_vector[1] * segment_vector[1]) ** 0.5
+        if segment_length <= 0:
+            continue
+        if distance_left <= segment_length:
+            return segment_vector
+        distance_left -= segment_length
+    left = coords[-2]
+    right = coords[-1]
+    return float(right[0] - left[0]), float(right[1] - left[1])
+
+
+def nearest_centerline_direction(
+    point: Point,
+    centerline_geometries: list[LineString],
+    centerline_tree: STRtree,
+    *,
+    search_radius_m: float = ROAD_BOUNDARY_INTERNAL_CENTERLINE_MAX_M,
+) -> tuple[float, tuple[float, float] | None]:
+    best_distance = float("inf")
+    best_vector: tuple[float, float] | None = None
+    for candidate in centerline_tree.query(point.buffer(search_radius_m)):
+        index = int(candidate)
+        line = centerline_geometries[index]
+        distance_to_line = point.distance(line)
+        if distance_to_line > search_radius_m or distance_to_line >= best_distance:
+            continue
+        direction = line_direction_at_distance(line, line.project(point))
+        if direction is None:
+            continue
+        best_distance = distance_to_line
+        best_vector = direction
+    return best_distance, best_vector
+
+
+def is_internal_perpendicular_boundary_edge(
+    start: tuple[float, float],
+    end: tuple[float, float],
+    centerline_geometries: list[LineString],
+    centerline_tree: STRtree,
+) -> bool:
+    edge_vector = (end[0] - start[0], end[1] - start[1])
+    edge_length = (edge_vector[0] * edge_vector[0] + edge_vector[1] * edge_vector[1]) ** 0.5
+    if edge_length > ROAD_BOUNDARY_INTERNAL_CAP_MAX_M:
+        return False
+    midpoint = Point((start[0] + end[0]) / 2.0, (start[1] + end[1]) / 2.0)
+    distance_to_centerline, centerline_vector = nearest_centerline_direction(
+        midpoint,
+        centerline_geometries,
+        centerline_tree,
+    )
+    if centerline_vector is None or distance_to_centerline > ROAD_BOUNDARY_INTERNAL_CENTERLINE_MAX_M:
+        return False
+    angle = vector_angle_degree(edge_vector, centerline_vector)
+    angle = min(angle, 180.0 - angle)
+    return (
+        ROAD_BOUNDARY_INTERNAL_MIN_ANGLE_DEG
+        <= angle
+        <= min(90.0, ROAD_BOUNDARY_INTERNAL_MAX_ANGLE_DEG)
+    )
+
+
+def split_boundary_coords_by_removed_edges(
+    coords: tuple[tuple[float, float], ...],
+    remove_indexes: set[int],
+) -> list[tuple[tuple[float, float], ...]]:
+    if not remove_indexes:
+        return [coords]
+    if len(coords) < 2:
+        return []
+    closed = coords[0] == coords[-1]
+    points = list(coords[:-1] if closed else coords)
+    edge_count = len(points) if closed else len(points) - 1
+    if edge_count <= 0:
+        return []
+    keep = [index not in remove_indexes for index in range(edge_count)]
+    chains: list[tuple[tuple[float, float], ...]] = []
+    if closed:
+        starts = [index for index, keep_edge in enumerate(keep) if keep_edge and not keep[(index - 1) % edge_count]]
+        visited: set[int] = set()
+        for start in starts:
+            chain = [points[start]]
+            index = start
+            while keep[index] and index not in visited:
+                visited.add(index)
+                chain.append(points[(index + 1) % len(points)])
+                index = (index + 1) % edge_count
+            chain_coords = tuple(chain)
+            if len(chain_coords) >= 2 and projected_length_meter(chain_coords) > MIN_LINE_LENGTH_M:
+                chains.append(chain_coords)
+        return chains
+
+    chain: list[tuple[float, float]] = []
+    for index in range(edge_count):
+        if keep[index]:
+            if not chain:
+                chain = [points[index]]
+            chain.append(points[index + 1])
+            continue
+        chain_coords = tuple(chain)
+        if len(chain_coords) >= 2 and projected_length_meter(chain_coords) > MIN_LINE_LENGTH_M:
+            chains.append(chain_coords)
+        chain = []
+    chain_coords = tuple(chain)
+    if len(chain_coords) >= 2 and projected_length_meter(chain_coords) > MIN_LINE_LENGTH_M:
+        chains.append(chain_coords)
+    return chains
+
+
+def filter_internal_perpendicular_boundaries(
+    boundary_lines: list[tuple[str, tuple[tuple[float, float], ...]]],
+    centerline_geometries: list[LineString],
+) -> tuple[list[tuple[str, tuple[tuple[float, float], ...]]], int]:
+    if not boundary_lines or not centerline_geometries:
+        return boundary_lines, 0
+    centerline_tree = STRtree(centerline_geometries)
+    filtered: list[tuple[str, tuple[tuple[float, float], ...]]] = []
+    removed_edges = 0
+    for segment_type, coords in boundary_lines:
+        closed = len(coords) >= 2 and coords[0] == coords[-1]
+        edge_count = len(coords) - 1
+        if closed:
+            edge_count = len(coords) - 1
+        remove_indexes: set[int] = set()
+        for index in range(edge_count):
+            start = coords[index]
+            end = coords[(index + 1) % len(coords)]
+            if is_internal_perpendicular_boundary_edge(start, end, centerline_geometries, centerline_tree):
+                remove_indexes.add(index)
+        removed_edges += len(remove_indexes)
+        for chain in split_boundary_coords_by_removed_edges(coords, remove_indexes):
+            filtered.append((segment_type, chain))
+    return filtered, removed_edges
+
+
+def boundary_lines_from_surface(
+    surface: object,
+    *,
+    exterior_area_max_m2: float | None = None,
+    remove_caps: bool = True,
+) -> list[tuple[str, tuple[tuple[float, float], ...]]]:
+    boundary_lines: list[tuple[str, tuple[tuple[float, float], ...]]] = []
+    for polygon in iter_polygons(surface):
+        if exterior_area_max_m2 is None or polygon.area <= exterior_area_max_m2:
+            exterior = dedupe_consecutive_coords(tuple((float(x), float(y)) for x, y in polygon.exterior.coords))
+            for line_coords in split_boundary_ring(exterior, remove_caps=remove_caps):
+                boundary_lines.append(("ROAD_BOUNDARY", line_coords))
+        for interior in polygon.interiors:
+            coords = dedupe_consecutive_coords(tuple((float(x), float(y)) for x, y in interior.coords))
+            for line_coords in split_boundary_ring(coords, remove_caps=remove_caps):
+                boundary_lines.append(("ROAD_BOUNDARY_INNER", line_coords))
+    return boundary_lines
 
 
 def offset_line_parts(
@@ -1530,6 +1800,154 @@ def build_sideline_payload(
     }
 
 
+def build_road_boundary_payload(
+    *,
+    center_lat: float = DEFAULT_CENTER_LAT,
+    center_lon: float = DEFAULT_CENTER_LON,
+    radius_m: int = DEFAULT_RADIUS_M,
+) -> dict[str, Any]:
+    validate_sidecars()
+    reader, encoding = open_reader()
+    fields = [field[0] for field in reader.fields[1:]]
+    width_index = fields.index("RVWD")
+    center_x, center_y = project_center(center_lat, center_lon)
+    clip_circle = Point(center_x, center_y).buffer(radius_m, resolution=64)
+
+    road_surfaces = []
+    centerline_geometries: list[LineString] = []
+    clipped_parts = 0
+    skipped_parts = 0
+    buffered_parts = 0
+    width_fallback_count = 0
+
+    for source_index, shape_record in enumerate(reader.iterShapeRecords(), start=1):
+        shape = shape_record.shape
+        record = shape_record.record
+        road_width_meter = parse_optional_float(record[width_index])
+        half_width = road_boundary_half_width(road_width_meter)
+        if road_width_meter is None or road_width_meter <= 0:
+            width_fallback_count += 1
+        if shape.bbox and not box(*shape.bbox).buffer(half_width + 1.0).intersects(clip_circle):
+            continue
+        for start, end in part_ranges(shape):
+            points = dedupe_consecutive_coords(tuple((float(x), float(y)) for x, y in shape.points[start:end]))
+            if len(points) < 2:
+                skipped_parts += 1
+                continue
+            centerline = LineString(points)
+            if centerline.is_empty or centerline.length <= MIN_LINE_LENGTH_M or not centerline.intersects(clip_circle):
+                continue
+            clipped = centerline.intersection(clip_circle)
+            for clipped_line in iter_lines(clipped):
+                clipped_coords = dedupe_consecutive_coords(tuple((float(x), float(y)) for x, y in clipped_line.coords))
+                if len(clipped_coords) < 2 or projected_length_meter(clipped_coords) <= MIN_LINE_LENGTH_M:
+                    skipped_parts += 1
+                    continue
+                clipped_parts += 1
+                clipped_centerline = LineString(clipped_coords)
+                centerline_geometries.append(clipped_centerline)
+                surface = clipped_centerline.buffer(
+                    half_width,
+                    cap_style=2,
+                    join_style=2,
+                    mitre_limit=2.0,
+                    resolution=4,
+                )
+                if surface.is_empty:
+                    skipped_parts += 1
+                    continue
+                road_surfaces.append(surface)
+                buffered_parts += 1
+
+    merged_surface = unary_union(road_surfaces) if road_surfaces else GeometryCollection()
+    if ROAD_BOUNDARY_SIMPLIFY_M > 0:
+        merged_surface = merged_surface.simplify(ROAD_BOUNDARY_SIMPLIFY_M, preserve_topology=True)
+
+    raw_boundary_lines = boundary_lines_from_surface(
+        merged_surface,
+        exterior_area_max_m2=None,
+        remove_caps=True,
+    )
+    boundary_lines, internal_perpendicular_prune_count = filter_internal_perpendicular_boundaries(
+        raw_boundary_lines,
+        centerline_geometries,
+    )
+
+    segment_features: list[dict[str, Any]] = []
+    edge_id = 1
+    for segment_type, projected_coords in boundary_lines:
+        coords = transform_projected_coords(projected_coords)
+        length_meter = line_length_meter(coords)
+        if len(coords) < 2 or length_meter <= MIN_LINE_LENGTH_M:
+            skipped_parts += 1
+            continue
+        segment_features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "edgeId": edge_id,
+                    "segmentType": segment_type,
+                    "lengthMeter": round(length_meter, 2),
+                },
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [list(point) for point in coords],
+                },
+            }
+        )
+        edge_id += 1
+
+    segment_counts = Counter(feature["properties"]["segmentType"] for feature in segment_features)
+    return {
+        "meta": {
+            "title": "Haeundae 5km Road Boundary Preview",
+            "centerLat": center_lat,
+            "centerLon": center_lon,
+            "radiusMeter": radius_m,
+            "sourceShp": str(RAW_DIR / f"{SHP_BASENAME}.shp"),
+            "sourceEncoding": encoding,
+            "outputHtml": str(ROAD_BOUNDARY_OUTPUT_HTML),
+            "outputGeojson": str(ROAD_BOUNDARY_OUTPUT_GEOJSON),
+            "localhostUrl": f"http://127.0.0.1:3000/etl/{ROAD_BOUNDARY_OUTPUT_HTML.name}",
+            "stage": "road-boundary-buffer-union",
+            "sourceShapeCount": len(reader),
+            "clippedPartCount": clipped_parts,
+            "bufferedPartCount": buffered_parts,
+            "skippedPartCount": skipped_parts,
+            "widthFallbackCount": width_fallback_count,
+            "boundaryRule": (
+                "buffer clipped centerlines by RVWD/2, union all road surfaces, then render polygon boundary rings"
+            ),
+            "halfWidthRule": (
+                f"halfWidth=max(RVWD/2,{ROAD_BOUNDARY_MIN_HALF_WIDTH_M}m); "
+                f"fallback={ROAD_BOUNDARY_FALLBACK_HALF_WIDTH_M}m"
+            ),
+            "simplifyMeter": ROAD_BOUNDARY_SIMPLIFY_M,
+            "exteriorAreaMaxMeter2": None,
+            "capRemovalMaxMeter": ROAD_BOUNDARY_CAP_MAX_M,
+            "internalPerpendicularPruneCount": internal_perpendicular_prune_count,
+            "internalPerpendicularMaxMeter": ROAD_BOUNDARY_INTERNAL_CAP_MAX_M,
+            "internalPerpendicularCenterlineMaxMeter": ROAD_BOUNDARY_INTERNAL_CENTERLINE_MAX_M,
+        },
+        "summary": {
+            "nodeCount": 0,
+            "segmentCount": len(segment_features),
+            "segmentTypeCounts": [{"name": name, "count": count} for name, count in sorted(segment_counts.items())],
+            "transitionConnectorCount": 0,
+            "gapBridgeCount": 0,
+            "cornerBridgeCount": 0,
+            "sameSideCornerBridgeCount": 0,
+            "crossSideCornerBridgeCount": 0,
+            "crossingCount": 0,
+            "elevatorConnectorCount": 0,
+        },
+        "layers": {
+            "roadNodes": {"type": "FeatureCollection", "features": []},
+            "roadSegments": {"type": "FeatureCollection", "features": segment_features},
+        },
+    }
+
+
 def projected_segments_from_payload(payload: dict[str, Any]) -> list[ProjectedSegment]:
     projected_segments: list[ProjectedSegment] = []
     for feature in payload["layers"]["roadSegments"]["features"]:
@@ -2166,6 +2584,29 @@ def write_graph_materialized_outputs(
     radius_m: int = DEFAULT_RADIUS_M,
 ) -> dict[str, Any]:
     payload = build_graph_materialized_payload(
+        center_lat=center_lat,
+        center_lon=center_lon,
+        radius_m=radius_m,
+    )
+    payload["meta"]["outputHtml"] = str(output_html)
+    payload["meta"]["outputGeojson"] = str(output_geojson)
+    payload["meta"]["localhostUrl"] = f"http://127.0.0.1:3000/etl/{output_html.name}"
+    output_geojson.parent.mkdir(parents=True, exist_ok=True)
+    output_html.parent.mkdir(parents=True, exist_ok=True)
+    output_geojson.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    output_html.write_text(subway_elevator_preview.render_html(payload), encoding="utf-8")
+    return payload
+
+
+def write_road_boundary_outputs(
+    *,
+    output_html: Path = ROAD_BOUNDARY_OUTPUT_HTML,
+    output_geojson: Path = ROAD_BOUNDARY_OUTPUT_GEOJSON,
+    center_lat: float = DEFAULT_CENTER_LAT,
+    center_lon: float = DEFAULT_CENTER_LON,
+    radius_m: int = DEFAULT_RADIUS_M,
+) -> dict[str, Any]:
+    payload = build_road_boundary_payload(
         center_lat=center_lat,
         center_lon=center_lon,
         radius_m=radius_m,

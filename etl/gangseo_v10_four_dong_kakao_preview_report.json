@@ -1,0 +1,81 @@
+{
+  "html": "C:\\Users\\SSAFY\\poc_v1\\etl\\gangseo_v10_four_dong_kakao_preview.html",
+  "data": "C:\\Users\\SSAFY\\poc_v1\\etl\\gangseo_v10_four_dong_kakao_preview_data.json",
+  "sourceCsv": "C:\\Users\\SSAFY\\poc_v1\\etl\\gangseo_road_segments_v3.csv",
+  "areas": [
+    {
+      "id": "myeongji",
+      "name": "명지동",
+      "bbox": {
+        "minLon": 128.895,
+        "minLat": 35.08,
+        "maxLon": 128.94,
+        "maxLat": 35.12
+      },
+      "counts": {
+        "segments": 6034,
+        "nodes": 5910,
+        "types": {
+          "SIDE_LINE": 6034
+        }
+      },
+      "note": "기존 Myeongji V10 bbox 기준"
+    },
+    {
+      "id": "sinho",
+      "name": "신호동",
+      "bbox": {
+        "minLon": 128.858,
+        "minLat": 35.075,
+        "maxLon": 128.895,
+        "maxLat": 35.105
+      },
+      "counts": {
+        "segments": 2038,
+        "nodes": 2019,
+        "types": {
+          "SIDE_LINE": 2036,
+          "SIDE_WALK": 2
+        }
+      },
+      "note": "기존 Sinho preview bbox 기준"
+    },
+    {
+      "id": "noksan",
+      "name": "녹산동",
+      "bbox": {
+        "minLon": 128.815,
+        "minLat": 35.075,
+        "maxLon": 128.858,
+        "maxLat": 35.135
+      },
+      "counts": {
+        "segments": 2292,
+        "nodes": 2308,
+        "types": {
+          "SIDE_LINE": 2292
+        }
+      },
+      "note": "기존 Noksan/Sinho/Songjeong/Hwajeon bbox의 서측 영역 기준"
+    },
+    {
+      "id": "hwajeon",
+      "name": "화전동",
+      "bbox": {
+        "minLon": 128.858,
+        "minLat": 35.105,
+        "maxLon": 128.895,
+        "maxLat": 35.135
+      },
+      "counts": {
+        "segments": 2824,
+        "nodes": 2830,
+        "types": {
+          "SIDE_LINE": 2824
+        }
+      },
+      "note": "기존 Noksan/Sinho/Songjeong/Hwajeon bbox의 북측 영역 기준"
+    }
+  ],
+  "elapsedSeconds": 3.96
+}

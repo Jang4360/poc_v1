@@ -30,6 +30,8 @@ DEFAULT_RADIUS_M = 5000
 SEGMENT_STYLES = {
     "CENTERLINE": {"strokeColor": "#111827", "strokeWeight": 3, "strokeOpacity": 0.84},
     "SIDE_LINE": {"strokeColor": "#dc2626", "strokeWeight": 3, "strokeOpacity": 0.84},
+    "ROAD_BOUNDARY": {"strokeColor": "#dc2626", "strokeWeight": 4, "strokeOpacity": 0.9},
+    "ROAD_BOUNDARY_INNER": {"strokeColor": "#dc2626", "strokeWeight": 3, "strokeOpacity": 0.84},
     "SIDE_WALK": {"strokeColor": "#2563eb", "strokeWeight": 3, "strokeOpacity": 0.9},
     "SIDE_LEFT": {"strokeColor": "#dc2626", "strokeWeight": 3, "strokeOpacity": 0.84},
     "SIDE_RIGHT": {"strokeColor": "#dc2626", "strokeWeight": 3, "strokeOpacity": 0.84},
@@ -182,6 +184,7 @@ def render_html(payload: dict[str, Any]) -> str:
         <div class="legend-item"><span class="legend-swatch" style="background:#111827"></span><span class="legend-label">road node</span></div>
         <div class="legend-item"><span class="legend-line" style="border-top-color:#111827"></span><span class="legend-label">centerline segment</span></div>
         <div class="legend-item"><span class="legend-line" style="border-top-color:#dc2626"></span><span class="legend-label">side line segment</span></div>
+        <div class="legend-item"><span class="legend-line" style="border-top-color:#dc2626"></span><span class="legend-label">road boundary</span></div>
         <div class="legend-item"><span class="legend-line" style="border-top-color:#2563eb"></span><span class="legend-label">side walk / crosswalk segment</span></div>
         <div class="legend-item"><span class="legend-line" style="border-top-color:#7c3aed"></span><span class="legend-label">transition connector</span></div>
         <div class="legend-item"><span class="legend-line" style="border-top-color:#f59e0b"></span><span class="legend-label">gap bridge</span></div>
