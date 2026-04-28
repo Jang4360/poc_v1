@@ -60,6 +60,8 @@ def test_build_csv_payload_filters_to_bbox(tmp_path: Path):
 
     assert payload["summary"]["nodeCount"] == 2
     assert payload["summary"]["segmentCount"] == 1
+    assert payload["meta"]["centerLon"] == 128.85
+    assert payload["meta"]["centerLat"] == 35.1
     segment = payload["layers"]["roadSegments"]["features"][0]
     assert segment["properties"]["edgeId"] == 10
     assert segment["properties"]["segmentType"] == "SIDE_LINE"

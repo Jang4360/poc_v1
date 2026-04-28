@@ -203,6 +203,7 @@ def render_html(payload: dict[str, Any]) -> str:
     const sourceVersion = "02c_graph_materialized";
     const nodeSnapRadiusMeter = 1.0;
     let mode = "pan";
+    let map = null;
     let overlays = [];
     let selectedStart = null;
     let addPreviewMarkers = [];
@@ -515,7 +516,25 @@ def render_html(payload: dict[str, Any]) -> str:
 
     function renderVisible() {{
       clearOverlays();
-      const box = boundsToBox(map.getBounds());
+      if (!map) return;
+      let box = null;
+      try {{
+        box = boundsToBox(map.getBounds());
+      }} catch (error) {{
+        const bbox = payload.meta.bbox || {{}};
+        if (
+          Number.isFinite(bbox.minLon) &&
+          Number.isFinite(bbox.minLat) &&
+          Number.isFinite(bbox.maxLon) &&
+          Number.isFinite(bbox.maxLat)
+        ) {{
+          box = {{ minLng: bbox.minLon, minLat: bbox.minLat, maxLng: bbox.maxLon, maxLat: bbox.maxLat }};
+        }}
+      }}
+      if (!box) {{
+        visibleStat.textContent = "visible unavailable";
+        return;
+      }}
       const hiddenSegments = deletedSegmentIds();
       const hiddenNodes = deletedNodeIds();
       const visibleSegments = payload.layers.roadSegments.features
@@ -539,6 +558,55 @@ def render_html(payload: dict[str, Any]) -> str:
         .filter(edit => edit.action === "add_node")
         .filter(edit => pointInBox(edit.geom.coordinates, box))
         .forEach(addManualNodeOverlay);
+      visibleStat.textContent = `visible segments ${{visibleSegments.length}}, nodes ${{visibleNodes.length}}, edits ${{manualEdits.length}}`;
+    }}
+
+    function renderAllFeaturesAndFit() {{
+      if (!map) return;
+      clearOverlays();
+      const hiddenSegments = deletedSegmentIds();
+      const hiddenNodes = deletedNodeIds();
+      const bounds = new kakao.maps.LatLngBounds();
+      let boundsCount = 0;
+      const visibleNodeIds = new Set();
+      const visibleSegments = payload.layers.roadSegments.features
+        .filter(feature => !hiddenSegments.has(feature.properties.edgeId));
+      visibleSegments.forEach(feature => {{
+        feature.geometry.coordinates.forEach(coord => {{
+          bounds.extend(latLngFromCoord(coord));
+          boundsCount += 1;
+        }});
+        visibleNodeIds.add(feature.properties.fromNodeId);
+        visibleNodeIds.add(feature.properties.toNodeId);
+        addLine(feature);
+      }});
+      const visibleNodes = payload.layers.roadNodes.features
+        .filter(feature => visibleNodeIds.has(feature.properties.vertexId))
+        .filter(feature => !hiddenNodes.has(feature.properties.vertexId));
+      visibleNodes.forEach(feature => {{
+        bounds.extend(latLngFromCoord(feature.geometry.coordinates));
+        boundsCount += 1;
+        addNode(feature);
+      }});
+      manualEdits
+        .filter(edit => edit.action === "add_segment")
+        .forEach(edit => {{
+          edit.geom.coordinates.forEach(coord => {{
+            bounds.extend(latLngFromCoord(coord));
+            boundsCount += 1;
+          }});
+          addManualSegmentOverlay(edit);
+        }});
+      manualEdits
+        .filter(edit => edit.action === "add_node")
+        .forEach(edit => {{
+          bounds.extend(latLngFromCoord(edit.geom.coordinates));
+          boundsCount += 1;
+          addManualNodeOverlay(edit);
+        }});
+      if (boundsCount > 0) {{
+        map.setBounds(bounds);
+      }}
       visibleStat.textContent = `visible segments ${{visibleSegments.length}}, nodes ${{visibleNodes.length}}, edits ${{manualEdits.length}}`;
     }}
 
@@ -592,7 +660,7 @@ def render_html(payload: dict[str, Any]) -> str:
     if (!window.kakao || !window.kakao.maps) {{
       mapEl.innerHTML = "<p style='padding:16px'>Kakao Maps SDK failed to load.</p>";
     }} else {{
-      var map = new kakao.maps.Map(mapEl, {{
+      map = new kakao.maps.Map(mapEl, {{
         center: new kakao.maps.LatLng(payload.meta.centerLat, payload.meta.centerLon),
         level: 4
       }});
@@ -619,7 +687,7 @@ def render_html(payload: dict[str, Any]) -> str:
           }};
           manualEdits.push(edit);
           persistEdits();
-          renderVisible();
+          renderAllFeaturesAndFit();
           showToast("node add recorded");
           return;
         }}
@@ -660,16 +728,16 @@ def render_html(payload: dict[str, Any]) -> str:
         addPreviewMarkers.forEach(item => item.setMap(null));
         addPreviewMarkers = [];
         persistEdits();
-        renderVisible();
+        renderAllFeaturesAndFit();
         showToast("segment add recorded");
       }});
-      renderVisible();
+      renderAllFeaturesAndFit();
     }}
 
     document.getElementById("mode-pan").addEventListener("click", () => setMode("pan"));
     document.getElementById("mode-delete").addEventListener("click", () => setMode("delete"));
     document.getElementById("mode-add").addEventListener("click", () => setMode("add"));
-    document.getElementById("reload-bbox").addEventListener("click", renderVisible);
+    document.getElementById("reload-bbox").addEventListener("click", renderAllFeaturesAndFit);
     document.getElementById("save-edits").addEventListener("click", () => saveJsonDocument(editDocument()));
     document.getElementById("update-csv").addEventListener("click", updateCsv);
     document.getElementById("copy-edits").addEventListener("click", async () => {{
@@ -679,13 +747,13 @@ def render_html(payload: dict[str, Any]) -> str:
     document.getElementById("undo-edit").addEventListener("click", () => {{
       manualEdits.pop();
       persistEdits();
-      renderVisible();
+      renderAllFeaturesAndFit();
       showToast("last edit removed");
     }});
     document.getElementById("reset-edits").addEventListener("click", () => {{
       manualEdits = [];
       persistEdits();
-      renderVisible();
+      renderAllFeaturesAndFit();
       showToast("manual_edits cleared");
     }});
     targetTypeEl.addEventListener("change", () => {{

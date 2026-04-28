@@ -81,6 +81,24 @@ def _bbox_intersects(
     return not (left[2] < right[0] or right[2] < left[0] or left[3] < right[1] or right[3] < left[1])
 
 
+def _bbox_to_dict(bbox: tuple[float, float, float, float]) -> dict[str, float]:
+    return {
+        "minLon": bbox[0],
+        "minLat": bbox[1],
+        "maxLon": bbox[2],
+        "maxLat": bbox[3],
+    }
+
+
+def _dict_to_bbox(value: dict[str, Any]) -> tuple[float, float, float, float]:
+    return (
+        float(value["minLon"]),
+        float(value["minLat"]),
+        float(value["maxLon"]),
+        float(value["maxLat"]),
+    )
+
+
 def _candidate_context_bbox(edit: dict[str, Any], padding_degree: float) -> tuple[float, float, float, float] | None:
     bbox = _geometry_bbox(edit.get("geom") or {})
     return _expand_bbox(bbox, padding_degree=padding_degree) if bbox else None
@@ -149,6 +167,13 @@ def build_training_dataset(
             "lengthMeter": round(length_meter, 2) if length_meter is not None else None,
             "edgeId": edit.get("edgeId"),
             "vertexId": edit.get("vertexId"),
+            "motif": _training_motif_for_edit(edit, length_meter),
+            "beforeAfterPatch": {
+                "operation": edit.get("operation"),
+                "entity": edit.get("entity"),
+                "hasGeometry": bool(coords),
+                "sourceAction": action,
+            },
         }
         if action == "add_segment":
             example["fromNodeMode"] = (edit.get("fromNode") or {}).get("mode")
@@ -161,6 +186,7 @@ def build_training_dataset(
     active_bbox = training_bbox or (_expand_bbox(inferred_bbox) if inferred_bbox else DEFAULT_TRAINING_BBOX)
     action_counts = Counter(example["action"] for example in examples)
     segment_type_counts = Counter(example["segmentType"] for example in examples if example["segmentType"])
+    motif_counts = Counter(example["motif"] for example in examples if example.get("motif"))
 
     return {
         "version": "02c_auto_edit_training_dataset",
@@ -176,9 +202,29 @@ def build_training_dataset(
             "exampleCount": len(examples),
             "actionCounts": dict(sorted(action_counts.items())),
             "segmentTypeCounts": dict(sorted(segment_type_counts.items())),
+            "motifCounts": dict(sorted(motif_counts.items())),
         },
         "examples": examples,
     }
+
+
+def _training_motif_for_edit(edit: dict[str, Any], length_meter: float | None) -> str:
+    action = edit.get("action")
+    if action == "delete_segment":
+        if length_meter is not None and length_meter <= 18.0:
+            return "delete_short_dangling_tail"
+        return "delete_intersection_or_outline_cleanup"
+    if action == "delete_node":
+        return "delete_orphan_or_redundant_node"
+    if action == "add_segment":
+        from_mode = (edit.get("fromNode") or {}).get("mode")
+        to_mode = (edit.get("toNode") or {}).get("mode")
+        if from_mode == "existing" and to_mode == "existing":
+            return "add_side_gap_bridge"
+        return "add_outline_or_corner_connector"
+    if action == "add_node":
+        return "add_outline_support_node"
+    return f"manual_{action or 'unknown'}"
 
 
 def learn_profile(training_dataset: dict[str, Any]) -> dict[str, Any]:
@@ -202,6 +248,11 @@ def learn_profile(training_dataset: dict[str, Any]) -> dict[str, Any]:
         for example in training_dataset["examples"]
         if example.get("action") == "add_segment"
     )
+    motif_counts = Counter(
+        example.get("motif")
+        for example in training_dataset["examples"]
+        if example.get("motif")
+    )
     learned_add_type = add_type_counts.most_common(1)[0][0] if add_type_counts else "SIDE_WALK"
 
     delete_max = min(max(_percentile(delete_lengths, 0.75, 35.0), 8.0), 80.0)
@@ -221,10 +272,11 @@ def learn_profile(training_dataset: dict[str, Any]) -> dict[str, Any]:
         },
         "learnedAddSegmentType": learned_add_type,
         "learnedAddEndpointModeCounts": dict(sorted(add_endpoint_mode_counts.items())),
+        "learnedMotifCounts": dict(sorted(motif_counts.items())),
         "policy": {
             "mode": "review_required",
-            "target": "Gangseo CSV outside training bbox",
-            "output": "manual_edits JSON candidates only; do not apply to CSV before human approval",
+            "target": "Gangseo CSV outside training bbox and inside optional generation bbox",
+            "output": "motif/evidence manual_edits JSON candidates only; do not apply to CSV before human approval",
         },
     }
 
@@ -235,6 +287,56 @@ def _degree_by_node(segments: list[dict[str, Any]]) -> Counter[int]:
         degree[int(segment["fromNodeId"])] += 1
         degree[int(segment["toNodeId"])] += 1
     return degree
+
+
+def _segment_angle_degree(segment: dict[str, Any]) -> float:
+    coords = segment["geometry"]["coordinates"]
+    start = coords[0]
+    end = coords[-1]
+    dx = float(end[0]) - float(start[0])
+    dy = float(end[1]) - float(start[1])
+    if dx == 0 and dy == 0:
+        return 0.0
+    import math
+
+    return round((math.degrees(math.atan2(dy, dx)) + 360.0) % 180.0, 2)
+
+
+def _build_point_grid(
+    nodes: dict[int, dict[str, Any]],
+    *,
+    cell_degree: float,
+) -> dict[tuple[int, int], list[int]]:
+    grid: dict[tuple[int, int], list[int]] = defaultdict(list)
+    for node_id, node in nodes.items():
+        lng, lat = node["geometry"]["coordinates"]
+        grid[(int(lng / cell_degree), int(lat / cell_degree))].append(node_id)
+    return grid
+
+
+def _nearby_node_count(
+    *,
+    node: dict[str, Any],
+    nodes: dict[int, dict[str, Any]],
+    grid: dict[tuple[int, int], list[int]],
+    cell_degree: float,
+    radius_meter: float,
+) -> int:
+    lng, lat = node["geometry"]["coordinates"]
+    cell = (int(lng / cell_degree), int(lat / cell_degree))
+    count = 0
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            for candidate_id in grid.get((cell[0] + dx, cell[1] + dy), []):
+                if candidate_id == node["vertexId"]:
+                    continue
+                distance = segment_graph_db.point_distance_meter(
+                    node["geometry"]["coordinates"],
+                    nodes[candidate_id]["geometry"]["coordinates"],
+                )
+                if distance <= radius_meter:
+                    count += 1
+    return count
 
 
 def _segment_direction_at_node(
@@ -272,7 +374,14 @@ def _endpoint_gap_alignment(
     return max(cosine(left_gap, left_inward), cosine(right_gap, right_inward))
 
 
-def _delete_candidate(segment: dict[str, Any], reason: str, confidence: float) -> dict[str, Any]:
+def _delete_candidate(
+    segment: dict[str, Any],
+    reason: str,
+    confidence: float,
+    *,
+    motif: str,
+    evidence: dict[str, Any],
+) -> dict[str, Any]:
     return {
         "action": "delete_segment",
         "entity": "road_segment",
@@ -282,6 +391,8 @@ def _delete_candidate(segment: dict[str, Any], reason: str, confidence: float) -
         "toNodeId": segment["toNodeId"],
         "segmentType": segment["segmentType"],
         "geom": segment["geometry"],
+        "motif": motif,
+        "evidence": evidence,
         "reason": reason,
         "confidence": round(confidence, 3),
         "createdAt": datetime.now(UTC).isoformat(),
@@ -296,6 +407,8 @@ def _add_candidate(
     distance_meter: float,
     reason: str,
     confidence: float,
+    motif: str,
+    evidence: dict[str, Any],
 ) -> dict[str, Any]:
     from_coord = from_node["geometry"]["coordinates"]
     to_coord = to_node["geometry"]["coordinates"]
@@ -321,6 +434,8 @@ def _add_candidate(
         },
         "geom": {"type": "LineString", "coordinates": [from_coord, to_coord]},
         "lengthMeter": round(distance_meter, 2),
+        "motif": motif,
+        "evidence": evidence,
         "reason": reason,
         "confidence": round(confidence, 3),
         "createdAt": datetime.now(UTC).isoformat(),
@@ -413,16 +528,11 @@ def generate_candidate_edits(
     output_add_segment_type: str = "SIDE_WALK",
     max_delete_candidates: int = 500,
     max_add_candidates: int = 300,
+    generation_bbox: tuple[float, float, float, float] | None = None,
 ) -> dict[str, Any]:
     nodes, segments = load_csv_graph(node_csv=node_csv, segment_csv=segment_csv)
     degree = _degree_by_node(segments)
-    bbox_dict = profile["trainingBbox"]
-    training_bbox = (
-        float(bbox_dict["minLon"]),
-        float(bbox_dict["minLat"]),
-        float(bbox_dict["maxLon"]),
-        float(bbox_dict["maxLat"]),
-    )
+    training_bbox = _dict_to_bbox(profile["trainingBbox"])
     thresholds = profile["thresholds"]
     delete_max_meter = float(thresholds["danglingDeleteMaxMeter"])
     add_min_meter = float(thresholds["gapAddMinMeter"])
@@ -433,13 +543,23 @@ def generate_candidate_edits(
         else output_add_segment_type
     )
     add_segment_type = segment_graph_db.normalize_segment_type(add_segment_type)
+    motif_counts = Counter(profile.get("learnedMotifCounts") or {})
+    learned_delete_motif = (
+        motif_counts.most_common(1)[0][0]
+        if motif_counts and motif_counts.most_common(1)[0][0].startswith("delete_")
+        else "delete_short_dangling_tail"
+    )
+    node_grid_cell_degree = max(12.0 / 85000.0, 0.00008)
+    node_grid = _build_point_grid(nodes, cell_degree=node_grid_cell_degree)
 
-    delete_edits: list[dict[str, Any]] = []
+    delete_candidates: list[dict[str, Any]] = []
     endpoint_segments: dict[int, dict[str, Any]] = {}
     connected_pairs: set[tuple[int, int]] = set()
     for segment in segments:
         connected_pairs.add(tuple(sorted((segment["fromNodeId"], segment["toNodeId"]))))
         if segment["segmentType"] != "SIDE_LINE":
+            continue
+        if generation_bbox is not None and not _geometry_in_bbox(segment["geometry"], generation_bbox):
             continue
         if _geometry_in_bbox(segment["geometry"], training_bbox):
             continue
@@ -449,18 +569,57 @@ def generate_candidate_edits(
         if dangling_count:
             endpoint_segments[segment["fromNodeId"]] = segment
             endpoint_segments[segment["toNodeId"]] = segment
-        if len(delete_edits) < max_delete_candidates and dangling_count and segment["lengthMeter"] <= delete_max_meter:
+        if dangling_count and segment["lengthMeter"] <= delete_max_meter:
             hub_degree = max(from_degree, to_degree)
+            from_nearby_count = _nearby_node_count(
+                node=nodes[segment["fromNodeId"]],
+                nodes=nodes,
+                grid=node_grid,
+                cell_degree=node_grid_cell_degree,
+                radius_meter=12.0,
+            )
+            to_nearby_count = _nearby_node_count(
+                node=nodes[segment["toNodeId"]],
+                nodes=nodes,
+                grid=node_grid,
+                cell_degree=node_grid_cell_degree,
+                radius_meter=12.0,
+            )
+            nearby_endpoint_count = max(from_nearby_count, to_nearby_count)
+            motif = (
+                "delete_intersection_overshoot"
+                if hub_degree >= 3 or nearby_endpoint_count >= 4 or learned_delete_motif == "delete_intersection_or_outline_cleanup"
+                else "delete_short_dangling_tail"
+            )
             confidence = 0.45 + min(0.35, (delete_max_meter - segment["lengthMeter"]) / max(delete_max_meter, 1.0) * 0.35)
             if hub_degree >= 3:
                 confidence += 0.15
-            delete_edits.append(
+            if motif == "delete_intersection_overshoot":
+                confidence += 0.05
+            evidence = {
+                "lengthMeter": round(segment["lengthMeter"], 2),
+                "fromDegree": from_degree,
+                "toDegree": to_degree,
+                "danglingEndpointCount": dangling_count,
+                "hubDegree": hub_degree,
+                "nearbyEndpointCount12m": nearby_endpoint_count,
+                "angleDegree": _segment_angle_degree(segment),
+                "trainingBboxExcluded": True,
+                "generationBboxMatched": generation_bbox is not None,
+            }
+            delete_candidates.append(
                 _delete_candidate(
                     segment,
-                    "auto_candidate_delete_short_dangling_side_line_review_required",
+                    f"auto_candidate_{motif}_review_required",
                     min(confidence, 0.95),
+                    motif=motif,
+                    evidence=evidence,
                 )
             )
+    delete_edits = sorted(
+        delete_candidates,
+        key=lambda edit: (-edit["confidence"], edit["evidence"]["lengthMeter"], edit.get("edgeId", 0)),
+    )[:max_delete_candidates]
 
     endpoint_node_ids = [
         node_id
@@ -468,6 +627,7 @@ def generate_candidate_edits(
         if degree[node_id] == 1
         and node_id in endpoint_segments
         and not _point_in_bbox(node["geometry"]["coordinates"], training_bbox)
+        and (generation_bbox is None or _point_in_bbox(node["geometry"]["coordinates"], generation_bbox))
     ]
     cell_degree = max(add_max_meter / 85000.0, 0.0001)
     grid: dict[tuple[int, int], list[int]] = defaultdict(list)
@@ -475,7 +635,7 @@ def generate_candidate_edits(
         lng, lat = nodes[node_id]["geometry"]["coordinates"]
         grid[(int(lng / cell_degree), int(lat / cell_degree))].append(node_id)
 
-    add_edits: list[dict[str, Any]] = []
+    add_candidates: list[dict[str, Any]] = []
     seen_pairs: set[tuple[int, int]] = set()
     best_pair_by_node: dict[int, tuple[float, int]] = {}
     for node_id in endpoint_node_ids:
@@ -520,23 +680,66 @@ def generate_candidate_edits(
 
     used_nodes: set[int] = set()
     for distance, node_id, other_id in sorted(candidate_pairs):
-        if len(add_edits) >= max_add_candidates:
-            break
         if node_id in used_nodes or other_id in used_nodes:
             continue
         used_nodes.add(node_id)
         used_nodes.add(other_id)
         confidence = 0.55 + max(0.0, (add_max_meter - distance) / max(add_max_meter, 1.0)) * 0.25
-        add_edits.append(
+        alignment = _endpoint_gap_alignment(
+            left_segment=endpoint_segments[node_id],
+            left_node_id=node_id,
+            right_segment=endpoint_segments[other_id],
+            right_node_id=other_id,
+        )
+        from_nearby_count = _nearby_node_count(
+            node=nodes[node_id],
+            nodes=nodes,
+            grid=node_grid,
+            cell_degree=node_grid_cell_degree,
+            radius_meter=12.0,
+        )
+        to_nearby_count = _nearby_node_count(
+            node=nodes[other_id],
+            nodes=nodes,
+            grid=node_grid,
+            cell_degree=node_grid_cell_degree,
+            radius_meter=12.0,
+        )
+        motif = (
+            "add_crosswalk_or_corner_connector"
+            if max(from_nearby_count, to_nearby_count) >= 4
+            else "add_side_gap_bridge"
+        )
+        evidence = {
+            "distanceMeter": round(distance, 2),
+            "alignmentCosine": round(alignment, 3),
+            "fromEndpointDegree": degree[node_id],
+            "toEndpointDegree": degree[other_id],
+            "fromNearbyEndpointCount12m": from_nearby_count,
+            "toNearbyEndpointCount12m": to_nearby_count,
+            "fromSourceSegmentId": endpoint_segments[node_id]["edgeId"],
+            "toSourceSegmentId": endpoint_segments[other_id]["edgeId"],
+            "fromSourceSegmentAngleDegree": _segment_angle_degree(endpoint_segments[node_id]),
+            "toSourceSegmentAngleDegree": _segment_angle_degree(endpoint_segments[other_id]),
+            "trainingBboxExcluded": True,
+            "generationBboxMatched": generation_bbox is not None,
+        }
+        add_candidates.append(
             _add_candidate(
                 from_node=nodes[node_id],
                 to_node=nodes[other_id],
                 segment_type=add_segment_type,
                 distance_meter=distance,
-                reason="auto_candidate_connect_mutual_nearest_dead_end_nodes_review_required",
+                reason=f"auto_candidate_{motif}_review_required",
                 confidence=min(confidence, 0.9),
+                motif=motif,
+                evidence=evidence,
             )
         )
+    add_edits = sorted(
+        add_candidates,
+        key=lambda edit: (-edit["confidence"], edit["evidence"]["distanceMeter"], edit.get("tempEdgeId", "")),
+    )[:max_add_candidates]
 
     edits = sorted(
         delete_edits + add_edits,
@@ -567,16 +770,19 @@ def generate_candidate_edits(
             "segmentCsv": str(segment_csv),
             "trainingBbox": profile["trainingBbox"],
             "profileThresholds": thresholds,
+            "generationBbox": _bbox_to_dict(generation_bbox) if generation_bbox else None,
             "candidateCounts": {
                 "delete_segment": len(delete_edits),
                 "add_segment": len(add_edits),
                 "total": len(edits),
             },
+            "motifCounts": dict(sorted(Counter(edit.get("motif") for edit in edits if edit.get("motif")).items())),
             "outputJson": str(DEFAULT_OUTPUT_DIR / "gangseo_02c_auto_manual_edit_candidates.json"),
             "approvedOutputJson": str(DEFAULT_APPROVED_JSON),
             "generationRules": [
-                "Delete candidates are short SIDE_LINE dangling segments outside the training bbox.",
-                "Add candidates connect nearby degree-1 endpoints outside the training bbox.",
+                "Candidate graph is pre-filtered by generation bbox when supplied, then caps are applied.",
+                "Delete candidates are motif/evidence classified short SIDE_LINE dangling or intersection overshoot segments outside the training bbox.",
+                "Add candidates are motif/evidence classified nearby degree-1 endpoint bridges outside the training bbox.",
                 "Candidates are manual_edits-compatible review inputs, not final CSV mutations.",
             ],
         },
@@ -597,6 +803,7 @@ def write_auto_edit_outputs(
     output_add_segment_type: str = "SIDE_WALK",
     max_delete_candidates: int = 500,
     max_add_candidates: int = 300,
+    generation_bbox: tuple[float, float, float, float] | None = None,
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     training_dataset = build_training_dataset(manual_edits=manual_edits, training_bbox=training_bbox)
@@ -608,6 +815,7 @@ def write_auto_edit_outputs(
         output_add_segment_type=output_add_segment_type,
         max_delete_candidates=max_delete_candidates,
         max_add_candidates=max_add_candidates,
+        generation_bbox=generation_bbox,
     )
 
     training_path = output_dir / "gangseo_02c_auto_edit_training_data.json"
@@ -621,12 +829,16 @@ def write_auto_edit_outputs(
     profile_path.write_text(json.dumps(profile, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     candidate_path.write_text(json.dumps(candidates, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     review_html_path.write_text(segment_graph_candidate_review_ui.render_html(candidates), encoding="utf-8")
+    diff_html_path = output_dir / "gangseo_02c_auto_candidate_diff_preview.html"
+    diff_html_path.write_text(segment_graph_candidate_review_ui.render_diff_html(candidates), encoding="utf-8")
     return {
         "trainingData": str(training_path),
         "profile": str(profile_path),
         "candidates": str(candidate_path),
         "reviewHtml": str(review_html_path),
+        "diffPreviewHtml": str(diff_html_path),
         "summary": candidates["meta"]["candidateCounts"],
+        "motifs": candidates["meta"]["motifCounts"],
         "thresholds": profile["thresholds"],
     }
 

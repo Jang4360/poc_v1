@@ -25,6 +25,25 @@ def render_html(candidate_document: dict[str, Any]) -> str:
     )
 
 
+def render_diff_html(candidate_document: dict[str, Any]) -> str:
+    payload_json = json.dumps(candidate_document, ensure_ascii=False)
+    title = "Gangseo 02C Auto Candidate Diff Preview"
+    counts = candidate_document.get("meta", {}).get("candidateCounts", {})
+    motifs = candidate_document.get("meta", {}).get("motifCounts", {})
+    count_text = (
+        f"delete {counts.get('delete_segment', 0)}, "
+        f"add {counts.get('add_segment', 0)}, total {counts.get('total', 0)}"
+    )
+    motif_text = ", ".join(f"{key} {value}" for key, value in sorted(motifs.items())) or "-"
+    return (
+        _DIFF_HTML_TEMPLATE.replace("__TITLE__", html.escape(title))
+        .replace("__COUNT_TEXT__", html.escape(count_text))
+        .replace("__MOTIF_TEXT__", html.escape(motif_text))
+        .replace("__KAKAO_KEY__", html.escape(KAKAO_JAVASCRIPT_KEY))
+        .replace("__CANDIDATE_DOCUMENT__", payload_json)
+    )
+
+
 _HTML_TEMPLATE = """<!doctype html>
 <html lang="ko">
 <head>
@@ -504,7 +523,8 @@ _HTML_TEMPLATE = """<!doctype html>
             <span class="candidate-title">${index + 1}. ${labelFor(edit)}</span>
             <span>${Number(edit.confidence || 0).toFixed(3)}</span>
           </div>
-          <div class="candidate-meta">${edit.reason || ""}</div>
+          <div class="candidate-meta">${edit.motif || ""} ${edit.reason || ""}</div>
+          <div class="candidate-meta">${JSON.stringify(edit.evidence || {})}</div>
           <div class="candidate-meta">${edit.reviewId}</div>
         `;
         card.addEventListener("click", event => {
@@ -616,6 +636,178 @@ _HTML_TEMPLATE = """<!doctype html>
     document.getElementById("action-all").addEventListener("click", () => setActionFilter("all"));
     document.getElementById("action-delete").addEventListener("click", () => setActionFilter("delete"));
     document.getElementById("action-add").addEventListener("click", () => setActionFilter("add"));
+  </script>
+</body>
+</html>
+"""
+
+
+_DIFF_HTML_TEMPLATE = """<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>__TITLE__</title>
+  <style>
+    html, body, #map {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #0f172a;
+    }
+    .panel {
+      position: absolute;
+      z-index: 800;
+      top: 12px;
+      left: 12px;
+      width: min(620px, calc(100vw - 24px));
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid #dbe3ef;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+    }
+    .panel h1 {
+      margin: 0 0 6px;
+      font-size: 16px;
+    }
+    .panel p {
+      margin: 0 0 6px;
+      color: #475569;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .swatch {
+      width: 22px;
+      height: 4px;
+      display: inline-block;
+    }
+    .warning {
+      padding: 8px 10px;
+      background: #eff6ff;
+      border: 1px solid #93c5fd;
+      color: #1d4ed8;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <section class="panel">
+    <h1>__TITLE__</h1>
+    <p>__COUNT_TEXT__</p>
+    <p>motifs: __MOTIF_TEXT__</p>
+    <p id="warning" class="warning" hidden></p>
+    <div class="legend">
+      <span class="legend-item"><span class="swatch" style="background:#b91c1c;opacity:.35"></span>existing</span>
+      <span class="legend-item"><span class="swatch" style="background:#7c3aed"></span>delete candidate</span>
+      <span class="legend-item"><span class="swatch" style="background:#16a34a"></span>add candidate</span>
+    </div>
+  </section>
+  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=__KAKAO_KEY__"></script>
+  <script>
+    const candidateDocument = __CANDIDATE_DOCUMENT__;
+    const warningEl = document.getElementById("warning");
+    const mapEl = document.getElementById("map");
+
+    function showWarning(message) {
+      warningEl.hidden = false;
+      warningEl.innerHTML = message;
+    }
+
+    function latLngFromCoord(coord) {
+      return new kakao.maps.LatLng(coord[1], coord[0]);
+    }
+
+    function extendBounds(bounds, coords) {
+      coords.forEach(coord => bounds.extend(latLngFromCoord(coord)));
+    }
+
+    function candidateCoords(edit) {
+      const geom = edit.geom || {};
+      if (geom.type === "LineString") return geom.coordinates || [];
+      if (geom.type === "Point") return [geom.coordinates];
+      return [];
+    }
+
+    function popupHtml(properties) {
+      return `<div style="padding:8px;max-width:360px;font:12px/1.4 sans-serif;word-break:break-word">${Object.entries(properties || {})
+        .map(([key, value]) => `<div><strong>${key}</strong>: ${typeof value === "object" ? JSON.stringify(value) : String(value ?? "-")}</div>`)
+        .join("")}</div>`;
+    }
+
+    if (!window.kakao || !window.kakao.maps) {
+      showWarning("Kakao Maps SDK failed to load. Open this file from the Kakao-allowed localhost port.");
+    } else {
+      const firstEdit = candidateDocument.edits[0] || {};
+      const firstCoords = candidateCoords(firstEdit);
+      const firstCenter = firstCoords[0] || [128.88, 35.13];
+      const map = new kakao.maps.Map(mapEl, {
+        center: latLngFromCoord(firstCenter),
+        level: 5
+      });
+      const bounds = new kakao.maps.LatLngBounds();
+      const infoWindow = new kakao.maps.InfoWindow({ removable: true });
+      let boundsCount = 0;
+
+      function addLine(coords, style, properties) {
+        if (!coords.length) return;
+        extendBounds(bounds, coords);
+        boundsCount += coords.length;
+        const line = new kakao.maps.Polyline({
+          map,
+          path: coords.map(latLngFromCoord),
+          strokeColor: style.color,
+          strokeWeight: style.weight,
+          strokeOpacity: style.opacity,
+          strokeStyle: style.strokeStyle || "solid",
+          zIndex: style.zIndex || 1
+        });
+        kakao.maps.event.addListener(line, "click", (mouseEvent) => {
+          infoWindow.setContent(popupHtml(properties));
+          infoWindow.setPosition(mouseEvent.latLng);
+          infoWindow.open(map);
+        });
+      }
+
+      ((candidateDocument.context || {}).roadSegments || { features: [] }).features.forEach(feature => {
+        addLine(feature.geometry.coordinates || [], {
+          color: "#b91c1c",
+          weight: 2,
+          opacity: 0.28,
+          zIndex: 1
+        }, feature.properties);
+      });
+
+      candidateDocument.edits.forEach(edit => {
+        const coords = candidateCoords(edit);
+        if (edit.action === "delete_segment") {
+          addLine(coords, {
+            color: "#7c3aed",
+            weight: 6,
+            opacity: 0.95,
+            strokeStyle: "dash",
+            zIndex: 10
+          }, edit);
+        } else if (edit.action === "add_segment") {
+          addLine(coords, {
+            color: "#16a34a",
+            weight: 6,
+            opacity: 0.95,
+            zIndex: 11
+          }, edit);
+        }
+      });
+
+      if (boundsCount > 0) map.setBounds(bounds);
+    }
   </script>
 </body>
 </html>

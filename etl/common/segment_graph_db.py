@@ -347,11 +347,17 @@ def build_csv_payload(
             if int(feature["properties"]["vertexId"]) in visible_node_ids or feature_in_bbox(feature, bbox)
         ]
 
+    center_lon = 128.872
+    center_lat = 35.095
+    if bbox is not None:
+        center_lon = (bbox[0] + bbox[2]) / 2
+        center_lat = (bbox[1] + bbox[3]) / 2
+
     payload = {
         "meta": {
             "title": "02C CSV-backed Graph Manual Edit UI",
-            "centerLat": 35.095,
-            "centerLon": 128.872,
+            "centerLat": round(center_lat, 7),
+            "centerLon": round(center_lon, 7),
             "radiusMeter": 0,
             "sourceShp": "road_nodes/road_segments CSV",
             "outputHtml": str(output_html),

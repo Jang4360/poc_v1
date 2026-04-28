@@ -192,7 +192,7 @@ def render_html(payload: dict[str, Any]) -> str:
       </div>
     </div>
   </section>
-  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_javascript_key}"></script>
+  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_javascript_key}&autoload=false" onerror="window.__kakaoSdkLoadFailed = true"></script>
   <script>
     const payload = {payload_json};
     const segmentStyles = {segment_styles_json};
@@ -227,9 +227,7 @@ def render_html(payload: dict[str, Any]) -> str:
       setWarning(`현재 <code>file://</code> 경로입니다. 카카오 SDK 안정성을 위해 <a href="${{payload.meta.localhostUrl}}">${{payload.meta.localhostUrl}}</a> 로 여는 편이 안전합니다.`);
     }}
 
-    if (!window.kakao || !window.kakao.maps) {{
-      setWarning(`Kakao Maps SDK를 불러오지 못했습니다. <a href="${{payload.meta.localhostUrl}}">${{payload.meta.localhostUrl}}</a> 로 다시 열어보세요.`);
-    }} else {{
+    function initializeMap() {{
       const map = new kakao.maps.Map(document.getElementById("map"), {{
         center: new kakao.maps.LatLng(payload.meta.centerLat, payload.meta.centerLon),
         level: 5
@@ -283,6 +281,16 @@ def render_html(payload: dict[str, Any]) -> str:
       kakao.maps.event.addListener(map, "click", () => infoWindow.close());
       map.setBounds(bounds);
     }}
+
+    function renderKakaoMap() {{
+      if (window.__kakaoSdkLoadFailed || !window.kakao || !window.kakao.maps || !window.kakao.maps.load) {{
+        setWarning(`Kakao Maps SDK를 불러오지 못했습니다. <a href="${{payload.meta.localhostUrl}}">${{payload.meta.localhostUrl}}</a> 로 다시 열어보세요.`);
+        return;
+      }}
+      kakao.maps.load(initializeMap);
+    }}
+
+    renderKakaoMap();
   </script>
 </body>
 </html>

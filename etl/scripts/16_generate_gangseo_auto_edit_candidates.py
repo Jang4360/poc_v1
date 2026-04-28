@@ -20,7 +20,7 @@ def parse_bbox(value: str | None) -> tuple[float, float, float, float] | None:
         return None
     values = tuple(float(item) for item in value.split(","))
     if len(values) != 4:
-        raise ValueError("--training-bbox must be minLon,minLat,maxLon,maxLat")
+        raise ValueError("bbox must be minLon,minLat,maxLon,maxLat")
     return values
 
 
@@ -42,6 +42,13 @@ def main() -> int:
         help="Training area to exclude from candidate generation, or 'infer' to use the manual edit extent.",
     )
     parser.add_argument(
+        "--generation-bbox",
+        help=(
+            "Optional target area for candidate generation as minLon,minLat,maxLon,maxLat. "
+            "When supplied, the graph is spatially filtered before candidate caps are applied."
+        ),
+    )
+    parser.add_argument(
         "--add-segment-type",
         choices=["SIDE_WALK", "SIDE_LINE", "learned"],
         default="learned",
@@ -61,6 +68,7 @@ def main() -> int:
         output_add_segment_type=args.add_segment_type,
         max_delete_candidates=args.max_delete_candidates,
         max_add_candidates=args.max_add_candidates,
+        generation_bbox=parse_bbox(args.generation_bbox),
     )
 
     print("gangseo-auto-edit-candidates: ok")
