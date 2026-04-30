@@ -11,6 +11,13 @@ def test_graph_edit_ui_contains_manual_edit_controls() -> None:
 
     assert "mode-delete" in rendered
     assert "mode-add" in rendered
+    assert "mode-roadview" in rendered
+    assert "Roadview" in rendered
+    assert "roadview-panel" in rendered
+    assert "roadview-close" in rendered
+    assert "RoadviewClient" in rendered
+    assert "getNearestPanoId" in rendered
+    assert "showRoadviewAt" in rendered
     assert "manual_edits" in rendered
     assert "delete_segment" in rendered
     assert "add_segment" in rendered
@@ -39,6 +46,8 @@ def test_graph_edit_ui_contains_manual_edit_controls() -> None:
     assert "Save JSON + CSV" not in rendered
     assert "segment_02c_manual_edits.json" in rendered
     assert "maxInteractiveSegmentOverlays" in rendered
+    assert "const maxInteractiveSegmentOverlays = 3600;" in rendered
+    assert "const maxInteractiveNodeOverlays = 5000;" in rendered
     assert "renderAllFeaturesAndFit" in rendered
     assert "scheduleRenderVisible" in rendered
     assert "editPreviewLimit" in rendered

@@ -87,6 +87,9 @@ def render_html(
       border-color: #0f172a;
       color: #ffffff;
     }}
+    #map.roadview-pick-mode {{
+      cursor: crosshair;
+    }}
     .toolbar .stat {{
       color: #475569;
       padding: 0 6px;
@@ -161,6 +164,50 @@ def render_html(
       border: 1px solid #cbd5e1;
       font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
     }}
+    .roadview-panel {{
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      background: #ffffff;
+    }}
+    .roadview-header {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 12px;
+      border-bottom: 1px solid #e2e8f0;
+      font-weight: 700;
+    }}
+    .roadview-close {{
+      width: 28px;
+      min-width: 28px;
+      height: 28px;
+      padding: 0;
+      font-size: 16px;
+      line-height: 1;
+    }}
+    .roadview-body {{
+      position: relative;
+      min-height: 0;
+    }}
+    #roadview-container {{
+      width: 100%;
+      height: 100%;
+    }}
+    .roadview-empty {{
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      color: #475569;
+      text-align: center;
+      background: #f8fafc;
+    }}
     .toast {{
       position: absolute;
       z-index: 820;
@@ -201,6 +248,7 @@ def render_html(
       <option value="SIDE_WALK">SIDE_WALK</option>
     </select>
     <button id="reload-bbox" type="button">Reload bbox</button>
+    <button id="mode-roadview" type="button">Roadview</button>
     <button id="box-delete-drag" class="danger hidden" type="button">Drag</button>
     <button id="box-delete-apply" class="danger hidden" type="button">Delete all</button>
     <span id="visible-stat" class="stat">visible -</span>
@@ -221,6 +269,16 @@ def render_html(
     </div>
     <div id="edits" class="edits"></div>
     <textarea id="edits-json" spellcheck="false" readonly></textarea>
+    <div id="roadview-panel" class="roadview-panel hidden">
+      <div class="roadview-header">
+        <span>Roadview</span>
+        <button id="roadview-close" class="roadview-close" type="button" aria-label="Close roadview">x</button>
+      </div>
+      <div class="roadview-body">
+        <div id="roadview-container"></div>
+        <div id="roadview-empty" class="roadview-empty">Click the map to open Kakao Roadview.</div>
+      </div>
+    </div>
   </aside>
   <div id="toast" class="toast hidden"></div>
   <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={kakao_javascript_key}"></script>
@@ -242,8 +300,8 @@ def render_html(
     let selectedStart = null;
     let addPreviewMarkers = [];
     let manualEdits = [];
-    const maxInteractiveSegmentOverlays = 2400;
-    const maxInteractiveNodeOverlays = 3200;
+    const maxInteractiveSegmentOverlays = 3600;
+    const maxInteractiveNodeOverlays = 5000;
     const editPreviewLimit = 80;
     const editJsonPreviewLimit = 120;
     let renderVisibleTimer = null;
@@ -251,6 +309,9 @@ def render_html(
     let selectionPoints = [];
     let selectionShape = null;
     let selectionVertexMarkers = [];
+    let roadview = null;
+    let roadviewClient = null;
+    let roadviewMarker = null;
 
     const mapEl = document.getElementById("map");
     const visibleStat = document.getElementById("visible-stat");
@@ -266,6 +327,9 @@ def render_html(
     const panelSourceEl = document.getElementById("panel-source");
     const panelCountsEl = document.getElementById("panel-counts");
     const panelTypesEl = document.getElementById("panel-types");
+    const roadviewPanelEl = document.getElementById("roadview-panel");
+    const roadviewContainerEl = document.getElementById("roadview-container");
+    const roadviewEmptyEl = document.getElementById("roadview-empty");
 
     function showToast(message) {{
       toastEl.textContent = message;
@@ -565,13 +629,57 @@ def render_html(
         clearSelectionPolygon();
         setBoxDeleteEnabled(false);
       }}
-      ["pan", "delete", "add"].forEach(name => {{
+      mapEl.classList.toggle("roadview-pick-mode", mode === "roadview");
+      ["pan", "delete", "add", "roadview"].forEach(name => {{
         document.getElementById(`mode-${{name}}`).classList.toggle("active", mode === name);
       }});
       if (mode === "delete") showToast(`Click a ${{targetTypeEl.value}} to delete`);
       else if (mode === "add") showToast(targetTypeEl.value === "node" ? "Click the map to add a node" : "Click two map points to add a segment");
+      else if (mode === "roadview") showToast("Click the map to open Roadview");
       else showToast("Select mode");
       updateDeleteBoxControls();
+    }}
+
+    function closeRoadviewPanel() {{
+      roadviewPanelEl.classList.add("hidden");
+      roadviewEmptyEl.classList.remove("hidden");
+      roadviewEmptyEl.textContent = "Click the map to open Kakao Roadview.";
+      if (roadviewMarker) {{
+        roadviewMarker.setMap(null);
+        roadviewMarker = null;
+      }}
+      if (mode === "roadview") setMode("pan");
+    }}
+
+    function showRoadviewAt(latLng) {{
+      if (!roadviewClient || !window.kakao.maps.Roadview) {{
+        showToast("Kakao Roadview is unavailable");
+        return;
+      }}
+      roadviewPanelEl.classList.remove("hidden");
+      roadviewEmptyEl.classList.remove("hidden");
+      roadviewEmptyEl.textContent = "Searching nearby Roadview...";
+      if (!roadview) {{
+        roadview = new kakao.maps.Roadview(roadviewContainerEl);
+      }}
+      if (roadviewMarker) roadviewMarker.setMap(null);
+      roadviewMarker = new kakao.maps.Marker({{
+        map,
+        position: latLng
+      }});
+      roadviewClient.getNearestPanoId(latLng, 80, panoId => {{
+        if (!panoId) {{
+          roadviewEmptyEl.classList.remove("hidden");
+          roadviewEmptyEl.textContent = "No Kakao Roadview was found near this point.";
+          showToast("No nearby Roadview");
+          return;
+        }}
+        roadviewEmptyEl.classList.add("hidden");
+        roadview.setPanoId(panoId, latLng);
+        window.setTimeout(() => {{
+          if (roadview && typeof roadview.relayout === "function") roadview.relayout();
+        }}, 0);
+      }});
     }}
 
     function deletedSegmentIds() {{
@@ -1078,8 +1186,15 @@ def render_html(
         center: new kakao.maps.LatLng({initial_center_lat:.7f}, {initial_center_lon:.7f}),
         level: 4
       }});
+      if (window.kakao.maps.RoadviewClient) {{
+        roadviewClient = new kakao.maps.RoadviewClient();
+      }}
       kakao.maps.event.addListener(map, "idle", scheduleRenderVisible);
       kakao.maps.event.addListener(map, "click", event => {{
+        if (mode === "roadview") {{
+          showRoadviewAt(event.latLng);
+          return;
+        }}
         if (mode === "delete" && boxDeleteEnabled && payload) {{
           addSelectionPoint(coordFromLatLng(event.latLng));
           return;
@@ -1154,6 +1269,8 @@ def render_html(
     document.getElementById("mode-pan").addEventListener("click", () => setMode("pan"));
     document.getElementById("mode-delete").addEventListener("click", () => setMode("delete"));
     document.getElementById("mode-add").addEventListener("click", () => setMode("add"));
+    document.getElementById("mode-roadview").addEventListener("click", () => setMode("roadview"));
+    document.getElementById("roadview-close").addEventListener("click", closeRoadviewPanel);
     document.getElementById("reload-bbox").addEventListener("click", renderAllFeaturesAndFit);
     boxDeleteDragEl.addEventListener("click", () => {{
       if (mode !== "delete") setMode("delete");

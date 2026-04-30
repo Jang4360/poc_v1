@@ -1,14 +1,14 @@
 {
   "sprint_name": "busan-eumgil-mvp-plan",
-  "updated_at": "2026-04-29",
+  "updated_at": "2026-04-30",
   "summary": {
     "planned": 6,
     "completed": 3,
     "in_progress": 0,
     "blocked": 0,
     "progress_percentage": 50.0,
-    "quality_adjusted_progress": 32.5,
-    "confidence_score": 0.65
+    "quality_adjusted_progress": 33.0,
+    "confidence_score": 0.66
   },
   "items": [
     {

@@ -21,3 +21,5 @@
 {"timestamp": "2026-04-26T16:08:35.215205Z", "signature": "haeundae-audio-signal-preview-generate", "outcome": "failed"}
 {"timestamp": "2026-04-28T11:18:37.820899Z", "signature": "gangseo-road-boundary-v2-radius-18000-union-timeout", "outcome": "failed"}
 {"timestamp": "2026-04-28T12:25:38.630868Z", "signature": "gangseo-v5-corner-split-zero-length-rounded-segments", "outcome": "failed"}
+{"timestamp": "2026-04-30T00:08:40.806962Z", "signature": "segment_graph_edit_ui_pytest_timeout", "outcome": "failed"}
+{"timestamp": "2026-04-30T02:13:40.444099Z", "signature": "gangseo-v5-attribute-map-startprocess-redirect-same-file", "outcome": "failed"}
