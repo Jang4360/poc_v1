@@ -18,8 +18,8 @@ from etl.common import segment_graph_auto_edit, segment_graph_db
 
 DEFAULT_DONG_ID = segment_graph_db.DEFAULT_GANGSEO_DONG_ID
 DEFAULT_BBOX = segment_graph_db.area_bbox_tuple(segment_graph_db.gangseo_dong_area(DEFAULT_DONG_ID))
-DEFAULT_NODE_CSV = segment_graph_db.ETL_DIR / "gangseo_road_nodes_v5.csv"
-DEFAULT_SEGMENT_CSV = segment_graph_db.ETL_DIR / "gangseo_road_segments_v5.csv"
+DEFAULT_NODE_CSV = segment_graph_db.ETL_DIR / "gangseo_road_nodes_v6.csv"
+DEFAULT_SEGMENT_CSV = segment_graph_db.ETL_DIR / "gangseo_road_segments_v6.csv"
 ALIAS_NODE_CSV = segment_graph_db.ETL_DIR / "road_nodes.csv"
 ALIAS_SEGMENT_CSV = segment_graph_db.ETL_DIR / "road_segments.csv"
 DEFAULT_CANDIDATE_JSON = segment_graph_auto_edit.DEFAULT_OUTPUT_DIR / "gangseo_02c_auto_manual_edit_candidates.json"

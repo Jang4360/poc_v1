@@ -264,3 +264,14 @@ def test_apply_and_render_rejects_unapproved_auto_candidates(tmp_path: Path):
         assert "cannot be applied before human approval" in str(exc)
     else:
         raise AssertionError("unapproved auto candidates should be rejected")
+
+
+def test_segment_editor_defaults_to_gangseo_v6_csvs():
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "15_serve_segment_02c_editor.py"
+    spec = importlib.util.spec_from_file_location("serve_segment_02c_editor", script_path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    assert module.DEFAULT_NODE_CSV.name == "gangseo_road_nodes_v6.csv"
+    assert module.DEFAULT_SEGMENT_CSV.name == "gangseo_road_segments_v6.csv"

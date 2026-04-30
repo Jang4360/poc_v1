@@ -1,0 +1,70 @@
+{
+  "outputs": {
+    "nodeCsv": "etl\\gangseo_road_nodes_v6.csv",
+    "segmentCsv": "etl\\gangseo_road_segments_v6.csv"
+  },
+  "sources": {
+    "base": {
+      "nodeCsv": "etl\\gangseo_road_nodes_v5.csv",
+      "segmentCsv": "etl\\gangseo_road_segments_v5.csv"
+    },
+    "replacement": {
+      "nodeCsv": "etl\\gangseo_road_nodes_v5 (1).csv",
+      "segmentCsv": "etl\\gangseo_road_segments_v5 (1).csv"
+    }
+  },
+  "targetDongIds": [
+    "daejeo1",
+    "daejeo2",
+    "gangdong",
+    "gonghang"
+  ],
+  "targetRule": "segment is selected when any LineString vertex falls inside one of the target dong bbox rectangles from GANGSEO_DONG_AREAS",
+  "base": {
+    "inputSegments": 46765,
+    "keptSegments": 22060,
+    "removedTargetSegments": 24705,
+    "removedTargetSegmentsByDongBbox": {
+      "gangdong": 10391,
+      "daejeo1": 10654,
+      "daejeo2": 11054,
+      "gonghang": 6209
+    }
+  },
+  "replacement": {
+    "inputSegments": 44955,
+    "takenTargetSegments": 19987,
+    "takenTargetSegmentsByDongBbox": {
+      "gangdong": 8226,
+      "daejeo1": 7569,
+      "daejeo2": 9857,
+      "gonghang": 5353
+    }
+  },
+  "output": {
+    "nodeCount": 47210,
+    "segmentCount": 42047,
+    "validation": {
+      "node_count": 47210,
+      "segment_count": 42047,
+      "orphan_edges": 0,
+      "invalid_geometries": 0,
+      "invalid_lengths": 0
+    },
+    "segmentTypeCounts": [
+      {
+        "name": "ROAD_BOUNDARY",
+        "count": 8145
+      },
+      {
+        "name": "ROAD_BOUNDARY_INNER",
+        "count": 28482
+      },
+      {
+        "name": "SIDE_LINE",
+        "count": 5420
+      }
+    ]
+  },
+  "idPolicy": "v6 renumbers all vertexId and edgeId sequentially and rewrites segment endpoint references; sourceNodeKey is prefixed with v6:base: or v6:replacement:"
+}

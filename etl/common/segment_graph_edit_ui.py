@@ -148,6 +148,11 @@ def render_html(
       word-break: break-all;
       color: #334155;
     }}
+    .edit-note {{
+      margin-bottom: 8px;
+      color: #475569;
+      font-size: 12px;
+    }}
     textarea {{
       width: calc(100% - 28px);
       height: 190px;
@@ -237,6 +242,11 @@ def render_html(
     let selectedStart = null;
     let addPreviewMarkers = [];
     let manualEdits = [];
+    const maxInteractiveSegmentOverlays = 2400;
+    const maxInteractiveNodeOverlays = 3200;
+    const editPreviewLimit = 80;
+    const editJsonPreviewLimit = 120;
+    let renderVisibleTimer = null;
     let boxDeleteEnabled = false;
     let selectionPoints = [];
     let selectionShape = null;
@@ -504,16 +514,46 @@ def render_html(
       return edit.action;
     }}
 
+    function summarizeEdit(edit) {{
+      if (edit.action === "delete_segment") return `${{edit.reason || "manual"}} edge=${{edit.edgeId}} type=${{edit.segmentType || "-"}}`;
+      if (edit.action === "delete_node") return `${{edit.reason || "manual"}} vertex=${{edit.vertexId}} incident=${{(edit.incidentSegmentIds || []).length}}`;
+      if (edit.action === "add_node") return `temp=${{edit.tempNodeId}}`;
+      if (edit.action === "add_segment") return `temp=${{edit.tempEdgeId}} type=${{edit.segmentType}}`;
+      return JSON.stringify(edit);
+    }}
+
     function renderEdits() {{
       editsEl.innerHTML = "";
-      manualEdits.slice().reverse().forEach((edit, reverseIndex) => {{
+      if (manualEdits.length > editPreviewLimit) {{
+        const note = document.createElement("div");
+        note.className = "edit-note";
+        note.textContent = `Showing latest ${{editPreviewLimit}} of ${{manualEdits.length}} edits. Full JSON is generated only when needed by Save JSON, Copy JSON, or Edit CSV.`;
+        editsEl.appendChild(note);
+      }}
+      const fragment = document.createDocumentFragment();
+      manualEdits.slice(-editPreviewLimit).reverse().forEach((edit, reverseIndex) => {{
         const index = manualEdits.length - reverseIndex;
         const card = document.createElement("div");
         card.className = "edit-card";
-        card.innerHTML = `<strong>${{index}}. ${{labelForEdit(edit)}}</strong><code>${{JSON.stringify(edit)}}</code>`;
-        editsEl.appendChild(card);
+        const title = document.createElement("strong");
+        title.textContent = `${{index}}. ${{labelForEdit(edit)}}`;
+        const detail = document.createElement("code");
+        detail.textContent = summarizeEdit(edit);
+        card.appendChild(title);
+        card.appendChild(detail);
+        fragment.appendChild(card);
       }});
-      editsJsonEl.value = JSON.stringify(editDocument(), null, 2);
+      editsEl.appendChild(fragment);
+      if (manualEdits.length <= editJsonPreviewLimit) {{
+        editsJsonEl.value = JSON.stringify(editDocument(), null, 2);
+      }} else {{
+        editsJsonEl.value = JSON.stringify({{
+          ...editDocument(),
+          edits: [],
+          editCount: manualEdits.length,
+          note: "full JSON is generated only when needed by Save JSON, Copy JSON, or Edit CSV"
+        }}, null, 2);
+      }}
     }}
 
     function setMode(nextMode) {{
@@ -738,7 +778,7 @@ def render_html(
         }});
         marker.setMap(null);
         persistEdits();
-        renderVisible();
+        scheduleRenderVisible();
         showToast(`node #${{props.vertexId}} delete recorded`);
       }});
       overlays.push(marker);
@@ -815,6 +855,14 @@ def render_html(
       overlays.push(marker);
     }}
 
+    function scheduleRenderVisible() {{
+      if (renderVisibleTimer) window.clearTimeout(renderVisibleTimer);
+      renderVisibleTimer = window.setTimeout(() => {{
+        renderVisibleTimer = null;
+        renderVisible();
+      }}, 90);
+    }}
+
     function renderVisible() {{
       clearOverlays();
       if (!map || !payload) return;
@@ -841,6 +889,10 @@ def render_html(
       const visibleSegments = payload.layers.roadSegments.features
         .filter(feature => !hiddenSegments.has(feature.properties.edgeId))
         .filter(feature => lineInBox(feature.geometry.coordinates, box));
+      if (visibleSegments.length > maxInteractiveSegmentOverlays) {{
+        visibleStat.textContent = `visible segments ${{visibleSegments.length}}; zoom in for interactive render (limit ${{maxInteractiveSegmentOverlays}}), edits ${{manualEdits.length}}`;
+        return;
+      }}
       const visibleNodeIds = new Set();
       visibleSegments.forEach(feature => {{
         visibleNodeIds.add(feature.properties.fromNodeId);
@@ -850,7 +902,9 @@ def render_html(
       const visibleNodes = payload.layers.roadNodes.features
         .filter(feature => visibleNodeIds.has(feature.properties.vertexId))
         .filter(feature => !hiddenNodes.has(feature.properties.vertexId));
-      visibleNodes.forEach(addNode);
+      if (visibleNodes.length <= maxInteractiveNodeOverlays) {{
+        visibleNodes.forEach(addNode);
+      }}
       manualEdits
         .filter(edit => edit.action === "add_segment")
         .filter(edit => lineInBox(edit.geom.coordinates, box))
@@ -859,7 +913,8 @@ def render_html(
         .filter(edit => edit.action === "add_node")
         .filter(edit => pointInBox(edit.geom.coordinates, box))
         .forEach(addManualNodeOverlay);
-      visibleStat.textContent = `visible segments ${{visibleSegments.length}}, nodes ${{visibleNodes.length}}, edits ${{manualEdits.length}}`;
+      const nodeText = visibleNodes.length > maxInteractiveNodeOverlays ? `${{visibleNodes.length}} (hidden; zoom in)` : visibleNodes.length;
+      visibleStat.textContent = `visible segments ${{visibleSegments.length}}, nodes ${{nodeText}}, edits ${{manualEdits.length}}`;
     }}
 
     function renderAllFeaturesAndFit() {{
@@ -879,7 +934,6 @@ def render_html(
         }});
         visibleNodeIds.add(feature.properties.fromNodeId);
         visibleNodeIds.add(feature.properties.toNodeId);
-        addLine(feature);
       }});
       const visibleNodes = payload.layers.roadNodes.features
         .filter(feature => visibleNodeIds.has(feature.properties.vertexId))
@@ -887,7 +941,6 @@ def render_html(
       visibleNodes.forEach(feature => {{
         bounds.extend(latLngFromCoord(feature.geometry.coordinates));
         boundsCount += 1;
-        addNode(feature);
       }});
       manualEdits
         .filter(edit => edit.action === "add_segment")
@@ -896,19 +949,18 @@ def render_html(
             bounds.extend(latLngFromCoord(coord));
             boundsCount += 1;
           }});
-          addManualSegmentOverlay(edit);
         }});
       manualEdits
         .filter(edit => edit.action === "add_node")
         .forEach(edit => {{
           bounds.extend(latLngFromCoord(edit.geom.coordinates));
           boundsCount += 1;
-          addManualNodeOverlay(edit);
         }});
       if (boundsCount > 0) {{
         map.setBounds(bounds);
       }}
-      visibleStat.textContent = `visible segments ${{visibleSegments.length}}, nodes ${{visibleNodes.length}}, edits ${{manualEdits.length}}`;
+      visibleStat.textContent = `fit bbox: segments ${{visibleSegments.length}}, nodes ${{visibleNodes.length}}, edits ${{manualEdits.length}}`;
+      scheduleRenderVisible();
     }}
 
     function deleteFeaturesInSelectionPolygon() {{
@@ -968,7 +1020,7 @@ def render_html(
       manualEdits.push(...segmentEdits, ...nodeEdits);
       persistEdits();
       clearSelectionPolygon();
-      renderVisible();
+      scheduleRenderVisible();
       showToast(`polygon delete recorded: ${{segmentEdits.length}} segments, ${{nodeEdits.length}} nodes`);
     }}
 
@@ -1026,7 +1078,7 @@ def render_html(
         center: new kakao.maps.LatLng({initial_center_lat:.7f}, {initial_center_lon:.7f}),
         level: 4
       }});
-      kakao.maps.event.addListener(map, "idle", renderVisible);
+      kakao.maps.event.addListener(map, "idle", scheduleRenderVisible);
       kakao.maps.event.addListener(map, "click", event => {{
         if (mode === "delete" && boxDeleteEnabled && payload) {{
           addSelectionPoint(coordFromLatLng(event.latLng));
@@ -1053,7 +1105,7 @@ def render_html(
           }};
           manualEdits.push(edit);
           persistEdits();
-          renderVisible();
+          scheduleRenderVisible();
           showToast("node add recorded");
           return;
         }}
@@ -1094,7 +1146,7 @@ def render_html(
         addPreviewMarkers.forEach(item => item.setMap(null));
         addPreviewMarkers = [];
         persistEdits();
-        renderVisible();
+        scheduleRenderVisible();
         showToast("segment add recorded");
       }});
     }}
@@ -1118,13 +1170,13 @@ def render_html(
     document.getElementById("undo-edit").addEventListener("click", () => {{
       manualEdits.pop();
       persistEdits();
-      renderVisible();
+      scheduleRenderVisible();
       showToast("last edit removed");
     }});
     document.getElementById("clear-edits").addEventListener("click", () => {{
       manualEdits = [];
       persistEdits();
-      renderVisible();
+      scheduleRenderVisible();
       showToast("manual_edits cleared");
     }});
     districtSelectEl.addEventListener("change", event => switchDistrict(event.target.value));

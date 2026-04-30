@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>강서구 강동동 CSV-backed Graph Manual Edit UI</title>
+  <title>강서구 신호동 CSV-backed Graph Manual Edit UI</title>
   <style>
     * {
       box-sizing: border-box;
@@ -119,6 +119,11 @@
       word-break: break-all;
       color: #334155;
     }
+    .edit-note {
+      margin-bottom: 8px;
+      color: #475569;
+      font-size: 12px;
+    }
     textarea {
       width: calc(100% - 28px);
       height: 190px;
@@ -173,7 +178,7 @@
   </div>
   <aside class="side-panel">
     <div class="panel-header">
-      <h1 id="panel-title">강서구 강동동 CSV-backed Graph Manual Edit UI</h1>
+      <h1 id="panel-title">강서구 신호동 CSV-backed Graph Manual Edit UI</h1>
       <p id="panel-source">source: -</p>
       <p id="panel-counts">nodes -, segments -</p>
       <p id="panel-types">types: -</p>
@@ -194,7 +199,7 @@
     const districtPayloads = {};
     const lazyPayloadEndpoint = "/api/segment-02c/payload";
     const dongAreas = [{"id": "gangseo_all", "name": "강서구 전체", "bbox": {"minLon": 128.765, "minLat": 34.993, "maxLon": 128.998, "maxLat": 35.236}}, {"id": "myeongji", "name": "명지동", "bbox": {"minLon": 128.895, "minLat": 35.08, "maxLon": 128.94, "maxLat": 35.12}}, {"id": "sinho", "name": "신호동", "bbox": {"minLon": 128.858, "minLat": 35.075, "maxLon": 128.895, "maxLat": 35.105}}, {"id": "noksan", "name": "녹산동", "bbox": {"minLon": 128.815, "minLat": 35.075, "maxLon": 128.858, "maxLat": 35.135}}, {"id": "hwajeon", "name": "화전동", "bbox": {"minLon": 128.858, "minLat": 35.105, "maxLon": 128.895, "maxLat": 35.135}}, {"id": "songjeong", "name": "송정동", "bbox": {"minLon": 128.815, "minLat": 35.045, "maxLon": 128.865, "maxLat": 35.085}}, {"id": "mium", "name": "미음동", "bbox": {"minLon": 128.835, "minLat": 35.135, "maxLon": 128.895, "maxLat": 35.175}}, {"id": "jisa", "name": "지사동", "bbox": {"minLon": 128.83, "minLat": 35.14, "maxLon": 128.895, "maxLat": 35.185}}, {"id": "saenggok", "name": "생곡동", "bbox": {"minLon": 128.855, "minLat": 35.125, "maxLon": 128.905, "maxLat": 35.165}}, {"id": "beombang", "name": "범방동", "bbox": {"minLon": 128.875, "minLat": 35.12, "maxLon": 128.925, "maxLat": 35.165}}, {"id": "gurang", "name": "구랑동", "bbox": {"minLon": 128.835, "minLat": 35.105, "maxLon": 128.875, "maxLat": 35.145}}, {"id": "garak", "name": "가락동", "bbox": {"minLon": 128.825, "minLat": 35.175, "maxLon": 128.925, "maxLat": 35.235}}, {"id": "gangdong", "name": "강동동", "bbox": {"minLon": 128.895, "minLat": 35.18, "maxLon": 128.965, "maxLat": 35.235}}, {"id": "daejeo1", "name": "대저1동", "bbox": {"minLon": 128.94, "minLat": 35.19, "maxLon": 129.005, "maxLat": 35.235}}, {"id": "daejeo2", "name": "대저2동", "bbox": {"minLon": 128.9, "minLat": 35.13, "maxLon": 129.005, "maxLat": 35.2}}, {"id": "gonghang", "name": "공항동", "bbox": {"minLon": 128.92, "minLat": 35.145, "maxLon": 128.995, "maxLat": 35.2}}, {"id": "gadeokdo", "name": "가덕도동", "bbox": {"minLon": 128.765, "minLat": 34.993, "maxLon": 128.855, "maxLat": 35.075}}];
-    const defaultAreaId = "gangdong";
+    const defaultAreaId = "sinho";
     let activeAreaId = defaultAreaId;
     let activeDistrict = "";
     let payload = districtPayloads[Object.keys(districtPayloads)[0]] || null;
@@ -208,6 +213,11 @@
     let selectedStart = null;
     let addPreviewMarkers = [];
     let manualEdits = [];
+    const maxInteractiveSegmentOverlays = 2400;
+    const maxInteractiveNodeOverlays = 3200;
+    const editPreviewLimit = 80;
+    const editJsonPreviewLimit = 120;
+    let renderVisibleTimer = null;
     let boxDeleteEnabled = false;
     let selectionPoints = [];
     let selectionShape = null;
@@ -475,16 +485,46 @@
       return edit.action;
     }
 
+    function summarizeEdit(edit) {
+      if (edit.action === "delete_segment") return `${edit.reason || "manual"} edge=${edit.edgeId} type=${edit.segmentType || "-"}`;
+      if (edit.action === "delete_node") return `${edit.reason || "manual"} vertex=${edit.vertexId} incident=${(edit.incidentSegmentIds || []).length}`;
+      if (edit.action === "add_node") return `temp=${edit.tempNodeId}`;
+      if (edit.action === "add_segment") return `temp=${edit.tempEdgeId} type=${edit.segmentType}`;
+      return JSON.stringify(edit);
+    }
+
     function renderEdits() {
       editsEl.innerHTML = "";
-      manualEdits.slice().reverse().forEach((edit, reverseIndex) => {
+      if (manualEdits.length > editPreviewLimit) {
+        const note = document.createElement("div");
+        note.className = "edit-note";
+        note.textContent = `Showing latest ${editPreviewLimit} of ${manualEdits.length} edits. Full JSON is generated only when needed by Save JSON, Copy JSON, or Edit CSV.`;
+        editsEl.appendChild(note);
+      }
+      const fragment = document.createDocumentFragment();
+      manualEdits.slice(-editPreviewLimit).reverse().forEach((edit, reverseIndex) => {
         const index = manualEdits.length - reverseIndex;
         const card = document.createElement("div");
         card.className = "edit-card";
-        card.innerHTML = `<strong>${index}. ${labelForEdit(edit)}</strong><code>${JSON.stringify(edit)}</code>`;
-        editsEl.appendChild(card);
+        const title = document.createElement("strong");
+        title.textContent = `${index}. ${labelForEdit(edit)}`;
+        const detail = document.createElement("code");
+        detail.textContent = summarizeEdit(edit);
+        card.appendChild(title);
+        card.appendChild(detail);
+        fragment.appendChild(card);
       });
-      editsJsonEl.value = JSON.stringify(editDocument(), null, 2);
+      editsEl.appendChild(fragment);
+      if (manualEdits.length <= editJsonPreviewLimit) {
+        editsJsonEl.value = JSON.stringify(editDocument(), null, 2);
+      } else {
+        editsJsonEl.value = JSON.stringify({
+          ...editDocument(),
+          edits: [],
+          editCount: manualEdits.length,
+          note: "full JSON is generated only when needed by Save JSON, Copy JSON, or Edit CSV"
+        }, null, 2);
+      }
     }
 
     function setMode(nextMode) {
@@ -709,7 +749,7 @@
         });
         marker.setMap(null);
         persistEdits();
-        renderVisible();
+        scheduleRenderVisible();
         showToast(`node #${props.vertexId} delete recorded`);
       });
       overlays.push(marker);
@@ -786,6 +826,14 @@
       overlays.push(marker);
     }
 
+    function scheduleRenderVisible() {
+      if (renderVisibleTimer) window.clearTimeout(renderVisibleTimer);
+      renderVisibleTimer = window.setTimeout(() => {
+        renderVisibleTimer = null;
+        renderVisible();
+      }, 90);
+    }
+
     function renderVisible() {
       clearOverlays();
       if (!map || !payload) return;
@@ -812,6 +860,10 @@
       const visibleSegments = payload.layers.roadSegments.features
         .filter(feature => !hiddenSegments.has(feature.properties.edgeId))
         .filter(feature => lineInBox(feature.geometry.coordinates, box));
+      if (visibleSegments.length > maxInteractiveSegmentOverlays) {
+        visibleStat.textContent = `visible segments ${visibleSegments.length}; zoom in for interactive render (limit ${maxInteractiveSegmentOverlays}), edits ${manualEdits.length}`;
+        return;
+      }
       const visibleNodeIds = new Set();
       visibleSegments.forEach(feature => {
         visibleNodeIds.add(feature.properties.fromNodeId);
@@ -821,7 +873,9 @@
       const visibleNodes = payload.layers.roadNodes.features
         .filter(feature => visibleNodeIds.has(feature.properties.vertexId))
         .filter(feature => !hiddenNodes.has(feature.properties.vertexId));
-      visibleNodes.forEach(addNode);
+      if (visibleNodes.length <= maxInteractiveNodeOverlays) {
+        visibleNodes.forEach(addNode);
+      }
       manualEdits
         .filter(edit => edit.action === "add_segment")
         .filter(edit => lineInBox(edit.geom.coordinates, box))
@@ -830,7 +884,8 @@
         .filter(edit => edit.action === "add_node")
         .filter(edit => pointInBox(edit.geom.coordinates, box))
         .forEach(addManualNodeOverlay);
-      visibleStat.textContent = `visible segments ${visibleSegments.length}, nodes ${visibleNodes.length}, edits ${manualEdits.length}`;
+      const nodeText = visibleNodes.length > maxInteractiveNodeOverlays ? `${visibleNodes.length} (hidden; zoom in)` : visibleNodes.length;
+      visibleStat.textContent = `visible segments ${visibleSegments.length}, nodes ${nodeText}, edits ${manualEdits.length}`;
     }
 
     function renderAllFeaturesAndFit() {
@@ -850,7 +905,6 @@
         });
         visibleNodeIds.add(feature.properties.fromNodeId);
         visibleNodeIds.add(feature.properties.toNodeId);
-        addLine(feature);
       });
       const visibleNodes = payload.layers.roadNodes.features
         .filter(feature => visibleNodeIds.has(feature.properties.vertexId))
@@ -858,7 +912,6 @@
       visibleNodes.forEach(feature => {
         bounds.extend(latLngFromCoord(feature.geometry.coordinates));
         boundsCount += 1;
-        addNode(feature);
       });
       manualEdits
         .filter(edit => edit.action === "add_segment")
@@ -867,19 +920,18 @@
             bounds.extend(latLngFromCoord(coord));
             boundsCount += 1;
           });
-          addManualSegmentOverlay(edit);
         });
       manualEdits
         .filter(edit => edit.action === "add_node")
         .forEach(edit => {
           bounds.extend(latLngFromCoord(edit.geom.coordinates));
           boundsCount += 1;
-          addManualNodeOverlay(edit);
         });
       if (boundsCount > 0) {
         map.setBounds(bounds);
       }
-      visibleStat.textContent = `visible segments ${visibleSegments.length}, nodes ${visibleNodes.length}, edits ${manualEdits.length}`;
+      visibleStat.textContent = `fit bbox: segments ${visibleSegments.length}, nodes ${visibleNodes.length}, edits ${manualEdits.length}`;
+      scheduleRenderVisible();
     }
 
     function deleteFeaturesInSelectionPolygon() {
@@ -939,7 +991,7 @@
       manualEdits.push(...segmentEdits, ...nodeEdits);
       persistEdits();
       clearSelectionPolygon();
-      renderVisible();
+      scheduleRenderVisible();
       showToast(`polygon delete recorded: ${segmentEdits.length} segments, ${nodeEdits.length} nodes`);
     }
 
@@ -994,10 +1046,10 @@
       mapEl.innerHTML = "<p style='padding:16px'>Kakao Maps SDK failed to load.</p>";
     } else {
       map = new kakao.maps.Map(mapEl, {
-        center: new kakao.maps.LatLng(35.2075000, 128.9300000),
+        center: new kakao.maps.LatLng(35.0900000, 128.8765000),
         level: 4
       });
-      kakao.maps.event.addListener(map, "idle", renderVisible);
+      kakao.maps.event.addListener(map, "idle", scheduleRenderVisible);
       kakao.maps.event.addListener(map, "click", event => {
         if (mode === "delete" && boxDeleteEnabled && payload) {
           addSelectionPoint(coordFromLatLng(event.latLng));
@@ -1024,7 +1076,7 @@
           };
           manualEdits.push(edit);
           persistEdits();
-          renderVisible();
+          scheduleRenderVisible();
           showToast("node add recorded");
           return;
         }
@@ -1065,7 +1117,7 @@
         addPreviewMarkers.forEach(item => item.setMap(null));
         addPreviewMarkers = [];
         persistEdits();
-        renderVisible();
+        scheduleRenderVisible();
         showToast("segment add recorded");
       });
     }
@@ -1089,13 +1141,13 @@
     document.getElementById("undo-edit").addEventListener("click", () => {
       manualEdits.pop();
       persistEdits();
-      renderVisible();
+      scheduleRenderVisible();
       showToast("last edit removed");
     });
     document.getElementById("clear-edits").addEventListener("click", () => {
       manualEdits = [];
       persistEdits();
-      renderVisible();
+      scheduleRenderVisible();
       showToast("manual_edits cleared");
     });
     districtSelectEl.addEventListener("change", event => switchDistrict(event.target.value));

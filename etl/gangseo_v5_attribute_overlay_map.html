@@ -1,0 +1,911 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gangseo V5 Attribute Overlay</title>
+  <style>
+    html, body, #map {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #111827;
+    }
+    .sidebar {
+      position: absolute;
+      z-index: 800;
+      top: 12px;
+      left: 12px;
+      width: min(390px, calc(100vw - 24px));
+      max-height: calc(100vh - 24px);
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      background: rgba(255, 255, 255, .96);
+      border: 1px solid #d1d5db;
+      box-shadow: 0 8px 24px rgba(17, 24, 39, .16);
+      transition: transform .18s ease;
+    }
+    .sidebar.collapsed {
+      transform: translateX(calc(-100% - 13px));
+    }
+    .collapse-button {
+      position: absolute;
+      top: 10px;
+      right: -38px;
+      width: 36px;
+      height: 36px;
+      border: 1px solid #d1d5db;
+      background: #fff;
+      box-shadow: 0 4px 12px rgba(17, 24, 39, .14);
+      cursor: pointer;
+      font-size: 18px;
+    }
+    .header {
+      padding: 12px 12px 8px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    h1 {
+      margin: 0;
+      font-size: 17px;
+      line-height: 1.2;
+    }
+    .tabs, .profile-toggle, .route-actions, .toolbar, .legend, .stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .tabs {
+      padding: 10px 12px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .tab-panel {
+      display: none;
+      overflow: auto;
+      padding: 12px;
+      max-height: calc(100vh - 130px);
+    }
+    .tab-panel.active {
+      display: block;
+    }
+    button, select, input {
+      height: 32px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      padding: 0 10px;
+      font: inherit;
+    }
+    button {
+      cursor: pointer;
+    }
+    button.active {
+      background: #111827;
+      border-color: #111827;
+      color: #fff;
+    }
+    .field {
+      display: grid;
+      gap: 5px;
+      margin-top: 10px;
+    }
+    .field label {
+      font-weight: 650;
+      color: #374151;
+    }
+    .field-label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .pick-controls {
+      display: inline-flex;
+      gap: 5px;
+    }
+    .pick-controls button {
+      height: 28px;
+      padding: 0 8px;
+    }
+    .pick-controls button:disabled {
+      color: #9ca3af;
+      background: #f3f4f6;
+      cursor: default;
+    }
+    .field input {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .route-actions {
+      margin-top: 12px;
+    }
+    .route-actions button {
+      width: 100%;
+      height: 36px;
+    }
+    .toolbar {
+      margin-bottom: 10px;
+    }
+    .legend {
+      margin: 8px 0;
+      color: #374151;
+    }
+    .item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .swatch {
+      width: 26px;
+      height: 4px;
+      display: inline-block;
+      background: #111827;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      background: #2563eb;
+    }
+    .stats {
+      color: #4b5563;
+      font-variant-numeric: tabular-nums;
+    }
+    .route-cards {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .route-card {
+      border: 1px solid #d1d5db;
+      background: #fff;
+      padding: 10px;
+      text-align: left;
+      height: auto;
+      cursor: pointer;
+    }
+    .route-card.active {
+      border-color: #111827;
+      box-shadow: inset 0 0 0 1px #111827;
+    }
+    .route-card strong {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    .route-meta {
+      color: #4b5563;
+      font-variant-numeric: tabular-nums;
+    }
+    .route-risk {
+      margin-top: 6px;
+      color: #6b7280;
+      font-size: 12px;
+    }
+    #status {
+      position: absolute;
+      z-index: 800;
+      right: 12px;
+      bottom: 12px;
+      max-width: min(900px, calc(100vw - 24px));
+      padding: 8px 10px;
+      background: rgba(17, 24, 39, .88);
+      color: white;
+    }
+    @media (max-width: 520px) {
+      .sidebar {
+        width: calc(100vw - 54px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <aside id="sidebar" class="sidebar">
+    <button id="collapse-sidebar" class="collapse-button" type="button" aria-label="toggle sidebar">‹</button>
+    <div class="header">
+      <h1>Gangseo V5 Attribute Overlay</h1>
+    </div>
+    <div class="tabs">
+      <button id="tab-route" class="active" type="button">길안내</button>
+      <button id="tab-data" type="button">데이터 적재</button>
+    </div>
+    <section id="route-panel" class="tab-panel active">
+      <div class="profile-toggle" aria-label="routing profile">
+        <button id="profile-mobility" class="active" type="button">mobility</button>
+        <button id="profile-visuality" type="button">visuality</button>
+      </div>
+      <div class="field">
+        <div class="field-label-row">
+          <label for="origin-input">출발지</label>
+          <span class="pick-controls">
+            <button id="pick-origin" type="button">마커</button>
+            <button id="confirm-origin" type="button" disabled>확정</button>
+          </span>
+        </div>
+        <input id="origin-input" type="text" placeholder="주소 또는 128.83456,35.08305" />
+      </div>
+      <div class="field">
+        <div class="field-label-row">
+          <label for="destination-input">도착지</label>
+          <span class="pick-controls">
+            <button id="pick-destination" type="button">마커</button>
+            <button id="confirm-destination" type="button" disabled>확정</button>
+          </span>
+        </div>
+        <input id="destination-input" type="text" placeholder="주소 또는 128.82480,35.08910" />
+      </div>
+      <div class="route-actions">
+        <button id="route-button" class="active" type="button">길안내</button>
+      </div>
+      <div id="route-cards" class="route-cards"></div>
+    </section>
+    <section id="data-panel" class="tab-panel">
+      <div class="toolbar">
+        <button id="toggle-base" class="active" type="button">V5</button>
+        <button id="toggle-shared" class="active" type="button">이면도로</button>
+        <button id="toggle-sidewalk" class="active" type="button">인도</button>
+        <button id="toggle-slope" class="active" type="button">경사도</button>
+        <button id="toggle-stairs" class="active" type="button">계단</button>
+        <select id="slope-state-filter" aria-label="slope state filter">
+          <option value="NONE">Slope: NONE</option>
+          <option value="ALL">Slope: ALL</option>
+          <option value="FLAT">Slope: FLAT</option>
+          <option value="MODERATE">Slope: MODERATE</option>
+          <option value="STEEP">Slope: STEEP</option>
+          <option value="IMPASSABLE">Slope: IMPASSABLE</option>
+          <option value="UNKNOWN">Slope: UNKNOWN</option>
+        </select>
+        <select id="surface-type-filter" aria-label="surface type filter">
+          <option value="NONE">Surface: NONE</option>
+          <option value="PAVED">Surface: PAVED</option>
+          <option value="UNPAVED">Surface: UNPAVED</option>
+          <option value="UNKNOWN">Surface: UNKNOWN</option>
+        </select>
+        <button id="fit-noksan" type="button">녹산동</button>
+        <button id="fit-full" type="button">전체</button>
+      </div>
+      <div class="legend">
+        <span class="item"><i class="swatch" style="background:#111827"></i>v5 segment</span>
+        <span class="item"><i class="swatch" style="background:#16a34a"></i>이면도로</span>
+        <span class="item"><i class="swatch" style="background:#8b5cf6"></i>인도</span>
+        <span class="item"><i class="swatch" style="background:#fdba74"></i>FLAT</span>
+        <span class="item"><i class="swatch" style="background:#fb923c"></i>MODERATE</span>
+        <span class="item"><i class="swatch" style="background:#ea580c"></i>STEEP</span>
+        <span class="item"><i class="swatch" style="background:#dc2626"></i>IMPASSABLE</span>
+        <span class="item"><i class="swatch" style="background:#0ea5e9"></i>PAVED</span>
+        <span class="item"><i class="swatch" style="background:#92400e"></i>UNPAVED</span>
+        <span class="item"><i class="dot"></i>계단</span>
+      </div>
+      <div id="stats" class="stats"></div>
+    </section>
+  </aside>
+  <div id="status">loading...</div>
+  <script>
+    if (location.protocol === "file:") {
+      location.replace(`http://localhost:3001/gangseo_v5_attribute_overlay_map.html${location.search}${location.hash}`);
+    }
+
+    if (location.hostname === "127.0.0.1") {
+      location.replace(`${location.protocol}//localhost:${location.port}${location.pathname}${location.search}${location.hash}`);
+    }
+
+    const visible = { base: true, shared: true, sidewalk: true, slope: true, surface: true, stairs: true };
+    const layers = { base: [], shared: [], sidewalk: [], slope: [], surface: [], stairs: [] };
+    const routeLayers = { route: [], markers: [] };
+    const toggleControls = {};
+    const colors = {
+      base: "#111827",
+      shared: "#16a34a",
+      sidewalk: "#8b5cf6",
+      stairs: "#2563eb"
+    };
+    const slopeColors = {
+      FLAT: "#fdba74",
+      MODERATE: "#fb923c",
+      STEEP: "#ea580c",
+      IMPASSABLE: "#dc2626",
+      UNKNOWN: "#9ca3af"
+    };
+    const surfaceColors = {
+      PAVED: "#0ea5e9",
+      UNPAVED: "#92400e",
+      UNKNOWN: "#6b7280"
+    };
+    const routeColors = { safe: "#2563eb", fast: "#f59e0b" };
+    let map;
+    let infoWindow;
+    let geocoder;
+    let places;
+    let metadata;
+    let renderToken = 0;
+    let activeProfile = "mobility";
+    let activePointPicker = null;
+    let mapPickClickHandler = null;
+    let dataVisibilitySnapshot = null;
+    let currentRoutes = [];
+    const pointPickers = {
+      origin: { marker: null, pending: null, fixed: null },
+      destination: { marker: null, pending: null, fixed: null }
+    };
+    const markerImages = {};
+    const statusEl = document.getElementById("status");
+    const statsEl = document.getElementById("stats");
+    const slopeStateFilterEl = document.getElementById("slope-state-filter");
+    const surfaceTypeFilterEl = document.getElementById("surface-type-filter");
+    const routeCardsEl = document.getElementById("route-cards");
+    const originInputEl = document.getElementById("origin-input");
+    const destinationInputEl = document.getElementById("destination-input");
+
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    }
+
+    function toLatLng(coord) {
+      return new kakao.maps.LatLng(coord[1], coord[0]);
+    }
+
+    function boundsFromBox(box) {
+      const sw = new kakao.maps.LatLng(box.minLat, box.minLng);
+      const ne = new kakao.maps.LatLng(box.maxLat, box.maxLng);
+      return new kakao.maps.LatLngBounds(sw, ne);
+    }
+
+    function mapBbox() {
+      const b = map.getBounds();
+      const sw = b.getSouthWest();
+      const ne = b.getNorthEast();
+      return [sw.getLng(), sw.getLat(), ne.getLng(), ne.getLat()].join(",");
+    }
+
+    function clearLayer(name) {
+      layers[name].forEach(item => item.setMap(null));
+      layers[name] = [];
+    }
+
+    function clearAll() {
+      Object.keys(layers).forEach(clearLayer);
+    }
+
+    function clearRoute() {
+      routeLayers.route.forEach(item => item.setMap(null));
+      routeLayers.markers.forEach(item => item.setMap(null));
+      routeLayers.route = [];
+      routeLayers.markers = [];
+    }
+
+    function setLayerMap(name) {
+      layers[name].forEach(item => item.setMap(visible[name] ? map : null));
+    }
+
+    function setVisibleLayer(name, value) {
+      visible[name] = value;
+      const control = toggleControls[name];
+      if (control) {
+        control.button.classList.toggle("active", visible[name]);
+        control.button.textContent = `${control.baseText} ${visible[name] ? "ON" : "OFF"}`;
+      }
+      setLayerMap(name);
+    }
+
+    function bindToggle(name, id) {
+      const button = document.getElementById(id);
+      const baseText = button.textContent;
+      toggleControls[name] = { button, baseText };
+      button.addEventListener("click", () => setVisibleLayer(name, !visible[name]));
+      setVisibleLayer(name, visible[name]);
+    }
+
+    function enterRouteLayerMode() {
+      if (!dataVisibilitySnapshot) {
+        dataVisibilitySnapshot = { ...visible };
+      }
+      setVisibleLayer("base", true);
+      ["shared", "sidewalk", "slope", "surface", "stairs"].forEach(name => setVisibleLayer(name, false));
+    }
+
+    function enterDataLayerMode() {
+      if (!dataVisibilitySnapshot) return;
+      Object.entries(dataVisibilitySnapshot).forEach(([name, value]) => setVisibleLayer(name, value));
+      dataVisibilitySnapshot = null;
+    }
+
+    function bindTab(tabName) {
+      const routeActive = tabName === "route";
+      document.getElementById("tab-route").classList.toggle("active", routeActive);
+      document.getElementById("tab-data").classList.toggle("active", !routeActive);
+      document.getElementById("route-panel").classList.toggle("active", routeActive);
+      document.getElementById("data-panel").classList.toggle("active", !routeActive);
+      if (routeActive) {
+        enterRouteLayerMode();
+      } else {
+        enterDataLayerMode();
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[<>&"]/g, ch => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "\"": "&quot;" }[ch]));
+    }
+
+    function popupContent(title, props) {
+      const rows = Object.entries(props || {})
+        .filter(([, value]) => value !== null && value !== undefined && value !== "")
+        .slice(0, 9)
+        .map(([key, value]) => `<div><b>${escapeHtml(key)}</b>: ${escapeHtml(value)}</div>`)
+        .join("");
+      return `<div style="padding:8px 10px;max-width:320px"><strong>${escapeHtml(title)}</strong>${rows ? `<div style="margin-top:6px">${rows}</div>` : ""}</div>`;
+    }
+
+    function drawLineFeature(layerName, feature, weight, opacity, zIndex) {
+      if (!feature.coords || feature.coords.length < 2) return;
+      const strokeColor = layerName === "slope"
+        ? (slopeColors[feature.props?.slopeState || "UNKNOWN"] || slopeColors.UNKNOWN)
+        : layerName === "surface"
+        ? (surfaceColors[feature.props?.surfaceType || "UNKNOWN"] || surfaceColors.UNKNOWN)
+        : colors[layerName];
+      const line = new kakao.maps.Polyline({
+        map: visible[layerName] ? map : null,
+        path: feature.coords.map(toLatLng),
+        strokeColor,
+        strokeWeight: weight,
+        strokeOpacity: opacity,
+        zIndex
+      });
+      kakao.maps.event.addListener(line, "click", mouseEvent => {
+        infoWindow.setContent(popupContent(feature.id || layerName, feature.props));
+        infoWindow.setPosition(mouseEvent.latLng);
+        infoWindow.open(map);
+      });
+      layers[layerName].push(line);
+    }
+
+    function drawPointFeature(feature) {
+      if (!feature.coords || feature.coords.length < 1) return;
+      const marker = new kakao.maps.Circle({
+        map: visible.stairs ? map : null,
+        center: toLatLng(feature.coords[0]),
+        radius: 6,
+        strokeWeight: 2,
+        strokeColor: colors.stairs,
+        strokeOpacity: .95,
+        fillColor: colors.stairs,
+        fillOpacity: .55,
+        zIndex: 40
+      });
+      kakao.maps.event.addListener(marker, "click", () => {
+        infoWindow.setContent(popupContent(feature.id || "stairs", feature.props));
+        infoWindow.setPosition(toLatLng(feature.coords[0]));
+        infoWindow.open(map);
+      });
+      layers.stairs.push(marker);
+    }
+
+    function drawPayload(payload) {
+      clearAll();
+      payload.base.forEach(feature => drawLineFeature("base", feature, 2, .62, 5));
+      payload.shared.forEach(feature => drawLineFeature("shared", feature, 4, .82, 20));
+      payload.sidewalk.forEach(feature => drawLineFeature("sidewalk", feature, 4, .82, 25));
+      payload.slope.forEach(feature => drawLineFeature("slope", feature, 3, .70, 15));
+      payload.surface.forEach(feature => drawLineFeature("surface", feature, 3, .68, 14));
+      payload.stairs.forEach(drawPointFeature);
+      statsEl.textContent = `v5 ${payload.base.length.toLocaleString()} / shared ${payload.shared.length.toLocaleString()} / sidewalk ${payload.sidewalk.length.toLocaleString()} / slope ${payload.slope.length.toLocaleString()} / surface ${payload.surface.length.toLocaleString()} / stairs ${payload.stairs.length.toLocaleString()}`;
+      statusEl.textContent = `visible bbox loaded, route graph nodes ${metadata.routeGraph.nodes.toLocaleString()}, edges ${metadata.routeGraph.edges.toLocaleString()}`;
+    }
+
+    async function renderVisible() {
+      if (!map || !metadata) return;
+      const token = ++renderToken;
+      statusEl.textContent = "loading viewport data...";
+      const slopeState = slopeStateFilterEl.value || "ALL";
+      const surfaceType = surfaceTypeFilterEl.value || "NONE";
+      const url = `/api/gangseo-v5-attribute-map-data?bbox=${encodeURIComponent(mapBbox())}&slopeState=${encodeURIComponent(slopeState)}&surfaceType=${encodeURIComponent(surfaceType)}`;
+      const payload = await fetch(url).then(response => {
+        if (!response.ok) throw new Error(`data request failed: ${response.status}`);
+        return response.json();
+      });
+      if (token !== renderToken) return;
+      drawPayload(payload);
+    }
+
+    function debounce(fn, delay) {
+      let timer = null;
+      return () => {
+        clearTimeout(timer);
+        timer = setTimeout(fn, delay);
+      };
+    }
+
+    function parseCoordinateInput(value) {
+      const numbers = String(value).match(/[-+]?\d+(?:\.\d+)?/g);
+      if (!numbers || numbers.length < 2) return null;
+      const first = Number(numbers[0]);
+      const second = Number(numbers[1]);
+      if (!Number.isFinite(first) || !Number.isFinite(second)) return null;
+      if (Math.abs(first) > 90) return { lng: first, lat: second };
+      return { lng: second, lat: first };
+    }
+
+    function formatCoord(lng, lat) {
+      return `${Number(lng).toFixed(8)},${Number(lat).toFixed(8)}`;
+    }
+
+    function pointInput(kind) {
+      return kind === "origin" ? originInputEl : destinationInputEl;
+    }
+
+    function markerButton(kind) {
+      return document.getElementById(kind === "origin" ? "pick-origin" : "pick-destination");
+    }
+
+    function confirmButton(kind) {
+      return document.getElementById(kind === "origin" ? "confirm-origin" : "confirm-destination");
+    }
+
+    function pointLabel(kind) {
+      return kind === "origin" ? "출발지" : "도착지";
+    }
+
+    function makeMarkerImage(kind) {
+      if (markerImages[kind]) return markerImages[kind];
+      const fill = kind === "origin" ? "#2563eb" : "#f59e0b";
+      const svg = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="34" height="42" viewBox="0 0 34 42">
+          <path d="M17 41C12.5 34.8 4 26.4 4 16.5C4 9.3 9.8 3.5 17 3.5s13 5.8 13 13C30 26.4 21.5 34.8 17 41z" fill="${fill}" stroke="#111827" stroke-width="2"/>
+          <circle cx="17" cy="16.5" r="5.5" fill="#fff"/>
+        </svg>`;
+      const src = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+      markerImages[kind] = new kakao.maps.MarkerImage(src, new kakao.maps.Size(34, 42), {
+        offset: new kakao.maps.Point(17, 41)
+      });
+      return markerImages[kind];
+    }
+
+    function updatePointButtons() {
+      ["origin", "destination"].forEach(kind => {
+        markerButton(kind).classList.toggle("active", activePointPicker === kind);
+        confirmButton(kind).disabled = activePointPicker !== kind || !pointPickers[kind].pending;
+      });
+    }
+
+    function clearMapPickHandler() {
+      if (mapPickClickHandler) {
+        kakao.maps.event.removeListener(map, "click", mapPickClickHandler);
+        mapPickClickHandler = null;
+      }
+    }
+
+    function latLngToCoord(latLng) {
+      return { lng: latLng.getLng(), lat: latLng.getLat() };
+    }
+
+    function movePointMarker(kind, latLng) {
+      const state = pointPickers[kind];
+      if (!state.marker) return;
+      state.marker.setPosition(latLng);
+      state.pending = latLngToCoord(latLng);
+      updatePointButtons();
+      statusEl.textContent = `${pointLabel(kind)} marker ${formatCoord(state.pending.lng, state.pending.lat)}`;
+    }
+
+    function ensurePointMarker(kind, coord) {
+      const state = pointPickers[kind];
+      const position = new kakao.maps.LatLng(coord.lat, coord.lng);
+      if (!state.marker) {
+        state.marker = new kakao.maps.Marker({
+          map,
+          position,
+          image: makeMarkerImage(kind),
+          draggable: false,
+          title: pointLabel(kind),
+          zIndex: 110
+        });
+        kakao.maps.event.addListener(state.marker, "dragend", () => {
+          if (activePointPicker === kind) {
+            movePointMarker(kind, state.marker.getPosition());
+          }
+        });
+      } else {
+        state.marker.setPosition(position);
+        state.marker.setMap(map);
+      }
+      state.pending = coord;
+      return state.marker;
+    }
+
+    async function initialPointForPicking(kind) {
+      const inputValue = pointInput(kind).value.trim();
+      if (inputValue) {
+        try {
+          return await resolveTextLocation(inputValue);
+        } catch {
+          const parsed = parseCoordinateInput(inputValue);
+          if (parsed) return parsed;
+        }
+      }
+      const center = map.getCenter();
+      return { lng: center.getLng(), lat: center.getLat() };
+    }
+
+    async function startPointPicking(kind) {
+      if (activePointPicker && activePointPicker !== kind && pointPickers[activePointPicker].marker) {
+        pointPickers[activePointPicker].marker.setDraggable(false);
+      }
+      clearMapPickHandler();
+      activePointPicker = kind;
+      const coord = await initialPointForPicking(kind);
+      const marker = ensurePointMarker(kind, coord);
+      marker.setDraggable(true);
+      marker.setMap(map);
+      map.panTo(marker.getPosition());
+      mapPickClickHandler = mouseEvent => movePointMarker(kind, mouseEvent.latLng);
+      kakao.maps.event.addListener(map, "click", mapPickClickHandler);
+      updatePointButtons();
+      statusEl.textContent = `${pointLabel(kind)} marker editing`;
+    }
+
+    function confirmPointPicking(kind) {
+      const state = pointPickers[kind];
+      if (!state.marker) return;
+      const position = state.marker.getPosition();
+      const coord = latLngToCoord(position);
+      state.pending = coord;
+      state.fixed = coord;
+      pointInput(kind).value = formatCoord(coord.lng, coord.lat);
+      state.marker.setDraggable(false);
+      if (activePointPicker === kind) {
+        activePointPicker = null;
+        clearMapPickHandler();
+      }
+      updatePointButtons();
+      statusEl.textContent = `${pointLabel(kind)} fixed ${pointInput(kind).value}`;
+    }
+
+    function resolveTextLocation(value) {
+      const parsed = parseCoordinateInput(value);
+      if (parsed) return Promise.resolve(parsed);
+      const keyword = String(value).trim();
+      if (!keyword) return Promise.reject(new Error("출발지와 도착지를 입력하세요."));
+      return new Promise((resolve, reject) => {
+        geocoder.addressSearch(keyword, (results, status) => {
+          if (status === kakao.maps.services.Status.OK && results.length) {
+            resolve({ lng: Number(results[0].x), lat: Number(results[0].y) });
+            return;
+          }
+          places.keywordSearch(keyword, (placeResults, placeStatus) => {
+            if (placeStatus === kakao.maps.services.Status.OK && placeResults.length) {
+              resolve({ lng: Number(placeResults[0].x), lat: Number(placeResults[0].y) });
+              return;
+            }
+            reject(new Error(`위치를 찾지 못했습니다: ${keyword}`));
+          }, {
+            location: new kakao.maps.LatLng(metadata.noksan.centerLat, metadata.noksan.centerLng),
+            radius: 20000
+          });
+        });
+      });
+    }
+
+    function routeBounds(coords) {
+      const bounds = new kakao.maps.LatLngBounds();
+      coords.forEach(coord => bounds.extend(toLatLng(coord)));
+      return bounds;
+    }
+
+    function drawSelectedRoute(kind) {
+      const route = currentRoutes.find(item => item.kind === kind);
+      if (!route || !route.coords.length) return;
+      clearRoute();
+      const line = new kakao.maps.Polyline({
+        map,
+        path: route.coords.map(toLatLng),
+        strokeColor: routeColors[route.kind],
+        strokeWeight: route.kind === "safe" ? 7 : 5,
+        strokeOpacity: .92,
+        zIndex: 90
+      });
+      routeLayers.route.push(line);
+      const start = new kakao.maps.Circle({
+        map,
+        center: toLatLng(route.coords[0]),
+        radius: 7,
+        strokeWeight: 2,
+        strokeColor: "#111827",
+        fillColor: "#fff",
+        fillOpacity: 1,
+        zIndex: 95
+      });
+      const end = new kakao.maps.Circle({
+        map,
+        center: toLatLng(route.coords[route.coords.length - 1]),
+        radius: 8,
+        strokeWeight: 2,
+        strokeColor: routeColors[route.kind],
+        fillColor: routeColors[route.kind],
+        fillOpacity: .85,
+        zIndex: 96
+      });
+      routeLayers.markers.push(start, end);
+      map.setBounds(routeBounds(route.coords));
+      [...routeCardsEl.querySelectorAll(".route-card")].forEach(card => {
+        card.classList.toggle("active", card.dataset.kind === kind);
+      });
+    }
+
+    function formatCounts(counts) {
+      const entries = Object.entries(counts || {}).filter(([, value]) => value);
+      if (!entries.length) return "특이사항 없음";
+      return entries.map(([key, value]) => `${key} ${value}`).join(" / ");
+    }
+
+    function renderRouteCards(routes) {
+      routeCardsEl.innerHTML = routes.map(route => `
+        <button class="route-card" type="button" data-kind="${escapeHtml(route.kind)}">
+          <strong style="color:${routeColors[route.kind]}">${escapeHtml(route.label)}</strong>
+          <div class="route-meta">${Number(route.distanceMeter).toLocaleString()}m · ${route.estimatedMinutes}분 · ${route.edgeCount} edges</div>
+          <div class="route-risk">경사 ${escapeHtml(formatCounts(route.slopeStateCounts))}</div>
+          <div class="route-risk">주의 ${escapeHtml(formatCounts(route.warningCounts))}</div>
+        </button>
+      `).join("");
+      [...routeCardsEl.querySelectorAll(".route-card")].forEach(card => {
+        card.addEventListener("click", () => drawSelectedRoute(card.dataset.kind));
+      });
+    }
+
+    async function requestRoutes() {
+      statusEl.textContent = "resolving route points...";
+      const [origin, destination] = await Promise.all([
+        resolveTextLocation(originInputEl.value),
+        resolveTextLocation(destinationInputEl.value)
+      ]);
+      statusEl.textContent = "routing...";
+      const params = new URLSearchParams({
+        profile: activeProfile,
+        originLng: String(origin.lng),
+        originLat: String(origin.lat),
+        destinationLng: String(destination.lng),
+        destinationLat: String(destination.lat)
+      });
+      const payload = await fetch(`/api/walk-route?${params}`).then(async response => {
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || `route request failed: ${response.status}`);
+        return body;
+      });
+      currentRoutes = payload.routes || [];
+      renderRouteCards(currentRoutes);
+      drawSelectedRoute("safe");
+      statusEl.textContent = `route loaded: snap origin ${payload.origin.snapDistanceMeter}m, destination ${payload.destination.snapDistanceMeter}m`;
+    }
+
+    function setProfile(profile) {
+      activeProfile = profile;
+      document.getElementById("profile-mobility").classList.toggle("active", profile === "mobility");
+      document.getElementById("profile-visuality").classList.toggle("active", profile === "visuality");
+    }
+
+    function syncSelectParam(selectEl, paramName, defaultValue) {
+      const params = new URLSearchParams(location.search);
+      if (selectEl.value === defaultValue) {
+        params.delete(paramName);
+      } else {
+        params.set(paramName, selectEl.value);
+      }
+      const query = params.toString();
+      history.replaceState(null, "", `${location.pathname}${query ? `?${query}` : ""}${location.hash}`);
+    }
+
+    async function initialize() {
+      metadata = await fetch("/api/gangseo-v5-attribute-map-meta").then(response => response.json());
+      const queryParams = new URLSearchParams(location.search);
+      const initialSlopeState = (queryParams.get("slopeState") || "ALL").toUpperCase();
+      if ([...slopeStateFilterEl.options].some(option => option.value === initialSlopeState)) {
+        slopeStateFilterEl.value = initialSlopeState;
+      }
+      const initialSurfaceType = (queryParams.get("surfaceType") || "NONE").toUpperCase();
+      if ([...surfaceTypeFilterEl.options].some(option => option.value === initialSurfaceType)) {
+        surfaceTypeFilterEl.value = initialSurfaceType;
+      }
+      map = new kakao.maps.Map(document.getElementById("map"), {
+        center: new kakao.maps.LatLng(metadata.noksan.centerLat, metadata.noksan.centerLng),
+        level: 6
+      });
+      map.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);
+      infoWindow = new kakao.maps.InfoWindow({ removable: true });
+      geocoder = new kakao.maps.services.Geocoder();
+      places = new kakao.maps.services.Places();
+      bindToggle("base", "toggle-base");
+      bindToggle("shared", "toggle-shared");
+      bindToggle("sidewalk", "toggle-sidewalk");
+      bindToggle("slope", "toggle-slope");
+      bindToggle("stairs", "toggle-stairs");
+      document.getElementById("fit-noksan").addEventListener("click", () => map.setBounds(boundsFromBox(metadata.noksan)));
+      document.getElementById("fit-full").addEventListener("click", () => map.setBounds(boundsFromBox(metadata.full)));
+      document.getElementById("tab-route").addEventListener("click", () => bindTab("route"));
+      document.getElementById("tab-data").addEventListener("click", () => bindTab("data"));
+      bindTab("route");
+      document.getElementById("collapse-sidebar").addEventListener("click", event => {
+        const sidebar = document.getElementById("sidebar");
+        sidebar.classList.toggle("collapsed");
+        event.currentTarget.textContent = sidebar.classList.contains("collapsed") ? "›" : "‹";
+      });
+      document.getElementById("profile-mobility").addEventListener("click", () => setProfile("mobility"));
+      document.getElementById("profile-visuality").addEventListener("click", () => setProfile("visuality"));
+      document.getElementById("pick-origin").addEventListener("click", () => {
+        startPointPicking("origin").catch(error => {
+          statusEl.textContent = error.message;
+          console.error(error);
+        });
+      });
+      document.getElementById("confirm-origin").addEventListener("click", () => confirmPointPicking("origin"));
+      document.getElementById("pick-destination").addEventListener("click", () => {
+        startPointPicking("destination").catch(error => {
+          statusEl.textContent = error.message;
+          console.error(error);
+        });
+      });
+      document.getElementById("confirm-destination").addEventListener("click", () => confirmPointPicking("destination"));
+      document.getElementById("route-button").addEventListener("click", () => {
+        requestRoutes().catch(error => {
+          statusEl.textContent = error.message;
+          console.error(error);
+        });
+      });
+      slopeStateFilterEl.addEventListener("change", () => {
+        syncSelectParam(slopeStateFilterEl, "slopeState", "ALL");
+        renderVisible().catch(error => {
+          statusEl.textContent = error.message;
+          console.error(error);
+        });
+      });
+      surfaceTypeFilterEl.addEventListener("change", () => {
+        syncSelectParam(surfaceTypeFilterEl, "surfaceType", "NONE");
+        renderVisible().catch(error => {
+          statusEl.textContent = error.message;
+          console.error(error);
+        });
+      });
+      kakao.maps.event.addListener(map, "idle", debounce(renderVisible, 180));
+      map.setBounds(boundsFromBox(metadata.noksan));
+      renderVisible().catch(error => {
+        statusEl.textContent = error.message;
+        console.error(error);
+      });
+
+      const routeProfile = (queryParams.get("profile") || "mobility").toLowerCase();
+      if (["mobility", "visuality"].includes(routeProfile)) setProfile(routeProfile);
+      if (queryParams.get("origin")) originInputEl.value = queryParams.get("origin");
+      if (queryParams.get("destination")) destinationInputEl.value = queryParams.get("destination");
+      if (queryParams.get("autoRoute") === "1" && originInputEl.value && destinationInputEl.value) {
+        requestRoutes().catch(error => {
+          statusEl.textContent = error.message;
+          console.error(error);
+        });
+      }
+    }
+
+    async function boot() {
+      const config = await fetch("/api/kakao-key").then(response => {
+        if (!response.ok) throw new Error("Kakao JavaScript key is missing from .env");
+        return response.json();
+      });
+      await loadScript(`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(config.key)}&autoload=false&libraries=services`);
+      if (!window.kakao || !window.kakao.maps || !window.kakao.maps.load) {
+        throw new Error("Kakao SDK load failed");
+      }
+      kakao.maps.load(initialize);
+    }
+
+    boot().catch(error => {
+      statusEl.textContent = error.message;
+      console.error(error);
+    });
+  </script>
+</body>
+</html>

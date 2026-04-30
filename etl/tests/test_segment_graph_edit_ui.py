@@ -38,6 +38,11 @@ def test_graph_edit_ui_contains_manual_edit_controls() -> None:
     assert 'const addableSegmentTypes = ["SIDE_LINE", "SIDE_WALK"];' in rendered
     assert "Save JSON + CSV" not in rendered
     assert "segment_02c_manual_edits.json" in rendered
+    assert "maxInteractiveSegmentOverlays" in rendered
+    assert "renderAllFeaturesAndFit" in rendered
+    assert "scheduleRenderVisible" in rendered
+    assert "editPreviewLimit" in rendered
+    assert "full JSON is generated only when needed" in rendered
 
 
 def test_graph_edit_ui_supports_lazy_dong_payloads() -> None:

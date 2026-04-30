@@ -10,6 +10,15 @@ etl/.pytest_cache/
 etl/*.csv
 etl/*.geojson
 etl/*.html
+etl/*.log
+!etl/gangseo_road_nodes_v6.csv
+!etl/gangseo_road_segments_v6.csv
+!etl/shared_local_road_edges.csv
+!etl/stair_p1_p2_candidates.csv
+!etl/road_slope_surface_width.csv
+!etl/sidewalk_segments.csv
+!etl/noksan_sinho_songjeong_hwajeon_segment_02c_graph_edit.html
+!etl/gangseo_v5_attribute_overlay_map.html
 .env
 runtime/
 __pycache__/
