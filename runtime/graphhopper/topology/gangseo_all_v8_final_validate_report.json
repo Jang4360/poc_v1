@@ -1,0 +1,349 @@
+{
+  "inputs": {
+    "segments": "etl/raw/gangseo_road_segments_v9.csv",
+    "nodes": "etl/raw/gangseo_road_nodes_v9.csv",
+    "endpointToleranceMeter": 1.0,
+    "smallComponentEdgeThreshold": 5
+  },
+  "summary": {
+    "segments": 50630,
+    "nodes": 47594,
+    "segmentTypes": {
+      "SIDE_LINE": 47899,
+      "SIDE_WALK": 2731
+    },
+    "missingSegmentColumns": [],
+    "missingNodeColumns": [],
+    "badNodeGeometries": 0,
+    "duplicateNodeIds": 0,
+    "badNodeReferences": 0,
+    "badSegmentGeometries": 0,
+    "endpointMismatches": 0,
+    "enumViolationColumns": {},
+    "duplicateEdgeIds": 0,
+    "duplicateNodePairEdges": 30,
+    "selfLoops": 0,
+    "referencedNodes": 47594,
+    "isolatedNodes": 0,
+    "connectedComponents": 1582,
+    "smallComponents": 712,
+    "componentEdgeBins": {
+      ">100": 35,
+      "51-100": 47,
+      "11-50": 446,
+      "6-10": 342,
+      "2-5": 620,
+      "1": 92
+    },
+    "largestComponentEdges": 17882,
+    "largestComponentEdgeRatio": 0.35319,
+    "smallComponentEdges": 2381
+  },
+  "samples": {
+    "badNodes": [],
+    "duplicateNodes": [],
+    "badNodeReferences": [],
+    "badSegmentGeometries": [],
+    "endpointMismatches": [],
+    "enumViolations": {},
+    "duplicateEdgeIds": [],
+    "duplicateNodePairEdges": [
+      {
+        "line": 4945,
+        "edgeId": "4954",
+        "fromNodeId": "2647",
+        "toNodeId": "2646",
+        "firstEdgeId": "2143"
+      },
+      {
+        "line": 9410,
+        "edgeId": "9414",
+        "fromNodeId": "10078",
+        "toNodeId": "10051",
+        "firstEdgeId": "8030"
+      },
+      {
+        "line": 9452,
+        "edgeId": "9456",
+        "fromNodeId": "9642",
+        "toNodeId": "9643",
+        "firstEdgeId": "7700"
+      },
+      {
+        "line": 9704,
+        "edgeId": "47892",
+        "fromNodeId": "12258",
+        "toNodeId": "50515",
+        "firstEdgeId": "7469"
+      },
+      {
+        "line": 13402,
+        "edgeId": "13399",
+        "fromNodeId": "12794",
+        "toNodeId": "12793",
+        "firstEdgeId": "10486"
+      },
+      {
+        "line": 15323,
+        "edgeId": "15308",
+        "fromNodeId": "9641",
+        "toNodeId": "9644",
+        "firstEdgeId": "7701"
+      },
+      {
+        "line": 47419,
+        "edgeId": "46729",
+        "fromNodeId": "50725",
+        "toNodeId": "50726",
+        "firstEdgeId": "48099"
+      },
+      {
+        "line": 47420,
+        "edgeId": "46730",
+        "fromNodeId": "50552",
+        "toNodeId": "50551",
+        "firstEdgeId": "48366"
+      },
+      {
+        "line": 47421,
+        "edgeId": "46731",
+        "fromNodeId": "50525",
+        "toNodeId": "50526",
+        "firstEdgeId": "48104"
+      },
+      {
+        "line": 47588,
+        "edgeId": "46898",
+        "fromNodeId": "50509",
+        "toNodeId": "50508",
+        "firstEdgeId": "48357"
+      },
+      {
+        "line": 47663,
+        "edgeId": "46974",
+        "fromNodeId": "51079",
+        "toNodeId": "51080",
+        "firstEdgeId": "48962"
+      },
+      {
+        "line": 47720,
+        "edgeId": "47031",
+        "fromNodeId": "50776",
+        "toNodeId": "50775",
+        "firstEdgeId": "47873"
+      },
+      {
+        "line": 47814,
+        "edgeId": "47125",
+        "fromNodeId": "51053",
+        "toNodeId": "51052",
+        "firstEdgeId": "49612"
+      },
+      {
+        "line": 47830,
+        "edgeId": "47141",
+        "fromNodeId": "50594",
+        "toNodeId": "50593",
+        "firstEdgeId": "49606"
+      },
+      {
+        "line": 47837,
+        "edgeId": "47148",
+        "fromNodeId": "50924",
+        "toNodeId": "50923",
+        "firstEdgeId": "49292"
+      },
+      {
+        "line": 47840,
+        "edgeId": "47151",
+        "fromNodeId": "51497",
+        "toNodeId": "51498",
+        "firstEdgeId": "49283"
+      },
+      {
+        "line": 47903,
+        "edgeId": "47214",
+        "fromNodeId": "17673",
+        "toNodeId": "17672",
+        "firstEdgeId": "18567"
+      },
+      {
+        "line": 47909,
+        "edgeId": "50593",
+        "fromNodeId": "50545",
+        "toNodeId": "50467",
+        "firstEdgeId": "47963"
+      },
+      {
+        "line": 47946,
+        "edgeId": "52954",
+        "fromNodeId": "52138",
+        "toNodeId": "52139",
+        "firstEdgeId": "29290"
+      },
+      {
+        "line": 47996,
+        "edgeId": "47304",
+        "fromNodeId": "50918",
+        "toNodeId": "50917",
+        "firstEdgeId": "50036"
+      }
+    ],
+    "selfLoops": [],
+    "isolatedNodes": [],
+    "largestComponents": [
+      {
+        "componentId": "2422",
+        "nodes": 15650,
+        "edges": 17882
+      },
+      {
+        "componentId": "21761",
+        "nodes": 1635,
+        "edges": 1845
+      },
+      {
+        "componentId": "18135",
+        "nodes": 1626,
+        "edges": 1767
+      },
+      {
+        "componentId": "27220",
+        "nodes": 1356,
+        "edges": 1421
+      },
+      {
+        "componentId": "15511",
+        "nodes": 1093,
+        "edges": 1129
+      },
+      {
+        "componentId": "24698",
+        "nodes": 993,
+        "edges": 1024
+      },
+      {
+        "componentId": "41066",
+        "nodes": 680,
+        "edges": 744
+      },
+      {
+        "componentId": "39249",
+        "nodes": 705,
+        "edges": 730
+      },
+      {
+        "componentId": "40438",
+        "nodes": 618,
+        "edges": 659
+      },
+      {
+        "componentId": "1262",
+        "nodes": 431,
+        "edges": 510
+      }
+    ],
+    "smallComponents": [
+      {
+        "componentId": "2869",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "41910",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "30240",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "20182",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "41411",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "21181",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "30478",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "23331",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "21893",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "16172",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "36973",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "5716",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "22204",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "31618",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "44814",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "41049",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "26120",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "37032",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "28548",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "23858",
+        "nodes": 6,
+        "edges": 5
+      }
+    ]
+  }
+}

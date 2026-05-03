@@ -1,0 +1,157 @@
+{
+  "inputs": {
+    "segments": "runtime/graphhopper/topology/gangseo_all_v8_0_12_split_segments.csv",
+    "nodes": "runtime/graphhopper/topology/gangseo_all_v8_0_12_split_nodes.csv",
+    "analysis": "runtime/graphhopper/topology/gangseo_all_v8_0_12_split_bridge_only_analysis_auto_0_12_split.json"
+  },
+  "outputs": {
+    "segments": "runtime/graphhopper/topology/gangseo_all_v8_0_12_split_segments.auto.tmp.csv",
+    "nodes": "runtime/graphhopper/topology/gangseo_all_v8_0_12_split_nodes.auto.tmp.csv"
+  },
+  "summary": {
+    "sourceSegments": 48174,
+    "sourceNodes": 44265,
+    "acceptedEndpointCandidates": 1,
+    "acceptedOrangeCandidates": 1,
+    "acceptedRedCandidates": 0,
+    "acceptedYellowCandidates": 4,
+    "appliedNodeMerges": 13,
+    "newSplitNodes": 4,
+    "yellowNodeMerges": 4,
+    "addedOrangeConnectors": 1,
+    "addedYellowConnectors": 0,
+    "removedOriginalSplitEdges": 4,
+    "removedSelfLoops": 0,
+    "removedShortEdges": 0,
+    "removedDuplicates": 0,
+    "outputSegments": 48179,
+    "outputNodes": 44254,
+    "skipped": 0
+  },
+  "addedOrange": [
+    {
+      "candidateId": "low-00001",
+      "edgeId": "57698",
+      "color": "orange"
+    }
+  ],
+  "addedYellowConnectors": [],
+  "nodeMerges": [
+    {
+      "candidateId": "merge-00001",
+      "fromNodeId": "55931",
+      "canonicalNodeId": "55933",
+      "distanceMeter": 0.25
+    },
+    {
+      "candidateId": "merge-00002",
+      "fromNodeId": "55936",
+      "canonicalNodeId": "55934",
+      "distanceMeter": 0.251
+    },
+    {
+      "candidateId": "merge-00003",
+      "fromNodeId": "55939",
+      "canonicalNodeId": "55933",
+      "distanceMeter": 0.353
+    },
+    {
+      "candidateId": "merge-00004",
+      "fromNodeId": "55952",
+      "canonicalNodeId": "55953",
+      "distanceMeter": 0.499
+    },
+    {
+      "candidateId": "merge-00005",
+      "fromNodeId": "55955",
+      "canonicalNodeId": "55956",
+      "distanceMeter": 0.499
+    },
+    {
+      "candidateId": "merge-00006",
+      "fromNodeId": "55948",
+      "canonicalNodeId": "55949",
+      "distanceMeter": 0.5
+    },
+    {
+      "candidateId": "merge-00007",
+      "fromNodeId": "55941",
+      "canonicalNodeId": "55933",
+      "distanceMeter": 0.559
+    },
+    {
+      "candidateId": "merge-00008",
+      "fromNodeId": "30298",
+      "canonicalNodeId": "30307",
+      "distanceMeter": 0.664
+    },
+    {
+      "candidateId": "merge-00009",
+      "fromNodeId": "55943",
+      "canonicalNodeId": "55942",
+      "distanceMeter": 0.707
+    },
+    {
+      "candidateId": "merge-00010",
+      "fromNodeId": "55947",
+      "canonicalNodeId": "55946",
+      "distanceMeter": 1.03
+    },
+    {
+      "candidateId": "merge-00011",
+      "fromNodeId": "55960",
+      "canonicalNodeId": "30301",
+      "distanceMeter": 1.037
+    },
+    {
+      "candidateId": "merge-00012",
+      "fromNodeId": "55937",
+      "canonicalNodeId": "30623",
+      "distanceMeter": 1.126
+    },
+    {
+      "candidateId": "merge-00013",
+      "fromNodeId": "55959",
+      "canonicalNodeId": "31873",
+      "distanceMeter": 1.574
+    }
+  ],
+  "yellowNodeMerges": [
+    {
+      "candidateId": "conn-00001",
+      "fromNodeId": "55937",
+      "canonicalNodeId": "55961",
+      "distanceMeter": 0.083
+    },
+    {
+      "candidateId": "conn-00002",
+      "fromNodeId": "55960",
+      "canonicalNodeId": "55962",
+      "distanceMeter": 0.206
+    },
+    {
+      "candidateId": "conn-00003",
+      "fromNodeId": "55940",
+      "canonicalNodeId": "55963",
+      "distanceMeter": 0.358
+    },
+    {
+      "candidateId": "conn-00004",
+      "fromNodeId": "55959",
+      "canonicalNodeId": "55964",
+      "distanceMeter": 0.686
+    }
+  ],
+  "removed": {
+    "originalSplitEdges": [
+      "29763",
+      "31117",
+      "57569",
+      "57658"
+    ],
+    "selfLoops": [],
+    "shortEdges": [],
+    "duplicates": []
+  },
+  "skipped": []
+}

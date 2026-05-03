@@ -1,0 +1,349 @@
+{
+  "inputs": {
+    "segments": "runtime/graphhopper/topology/gangseo_all_v8_segments.csv",
+    "nodes": "runtime/graphhopper/topology/gangseo_all_v8_nodes.csv",
+    "endpointToleranceMeter": 1.0,
+    "smallComponentEdgeThreshold": 5
+  },
+  "summary": {
+    "segments": 47772,
+    "nodes": 50430,
+    "segmentTypes": {
+      "SIDE_LINE": 45048,
+      "SIDE_WALK": 2724
+    },
+    "missingSegmentColumns": [],
+    "missingNodeColumns": [],
+    "badNodeGeometries": 0,
+    "duplicateNodeIds": 0,
+    "badNodeReferences": 0,
+    "badSegmentGeometries": 0,
+    "endpointMismatches": 0,
+    "enumViolationColumns": {},
+    "duplicateEdgeIds": 0,
+    "duplicateNodePairEdges": 499,
+    "selfLoops": 0,
+    "referencedNodes": 50430,
+    "isolatedNodes": 0,
+    "connectedComponents": 6238,
+    "smallComponents": 4084,
+    "componentEdgeBins": {
+      ">100": 4,
+      "51-100": 21,
+      "11-50": 876,
+      "6-10": 1253,
+      "2-5": 2418,
+      "1": 1666
+    },
+    "largestComponentEdges": 10626,
+    "largestComponentEdgeRatio": 0.222432,
+    "smallComponentEdges": 9820
+  },
+  "samples": {
+    "badNodes": [],
+    "duplicateNodes": [],
+    "badNodeReferences": [],
+    "badSegmentGeometries": [],
+    "endpointMismatches": [],
+    "enumViolations": {},
+    "duplicateEdgeIds": [],
+    "duplicateNodePairEdges": [
+      {
+        "line": 53,
+        "edgeId": "52",
+        "fromNodeId": "73",
+        "toNodeId": "72",
+        "firstEdgeId": "51"
+      },
+      {
+        "line": 683,
+        "edgeId": "682",
+        "fromNodeId": "826",
+        "toNodeId": "825",
+        "firstEdgeId": "681"
+      },
+      {
+        "line": 798,
+        "edgeId": "797",
+        "fromNodeId": "968",
+        "toNodeId": "967",
+        "firstEdgeId": "796"
+      },
+      {
+        "line": 1037,
+        "edgeId": "1036",
+        "fromNodeId": "1261",
+        "toNodeId": "1260",
+        "firstEdgeId": "1035"
+      },
+      {
+        "line": 1749,
+        "edgeId": "1748",
+        "fromNodeId": "2131",
+        "toNodeId": "2130",
+        "firstEdgeId": "1747"
+      },
+      {
+        "line": 1751,
+        "edgeId": "1750",
+        "fromNodeId": "2133",
+        "toNodeId": "2132",
+        "firstEdgeId": "1749"
+      },
+      {
+        "line": 2932,
+        "edgeId": "2931",
+        "fromNodeId": "3624",
+        "toNodeId": "3623",
+        "firstEdgeId": "2930"
+      },
+      {
+        "line": 2984,
+        "edgeId": "2983",
+        "fromNodeId": "3685",
+        "toNodeId": "3684",
+        "firstEdgeId": "2982"
+      },
+      {
+        "line": 3045,
+        "edgeId": "3044",
+        "fromNodeId": "3747",
+        "toNodeId": "3746",
+        "firstEdgeId": "3043"
+      },
+      {
+        "line": 3068,
+        "edgeId": "3067",
+        "fromNodeId": "3770",
+        "toNodeId": "3769",
+        "firstEdgeId": "3066"
+      },
+      {
+        "line": 3256,
+        "edgeId": "3255",
+        "fromNodeId": "3996",
+        "toNodeId": "3995",
+        "firstEdgeId": "3254"
+      },
+      {
+        "line": 3337,
+        "edgeId": "3336",
+        "fromNodeId": "4091",
+        "toNodeId": "4090",
+        "firstEdgeId": "3335"
+      },
+      {
+        "line": 3548,
+        "edgeId": "3547",
+        "fromNodeId": "4347",
+        "toNodeId": "4346",
+        "firstEdgeId": "3546"
+      },
+      {
+        "line": 3668,
+        "edgeId": "3667",
+        "fromNodeId": "4490",
+        "toNodeId": "4489",
+        "firstEdgeId": "3666"
+      },
+      {
+        "line": 3782,
+        "edgeId": "3781",
+        "fromNodeId": "4628",
+        "toNodeId": "4627",
+        "firstEdgeId": "3780"
+      },
+      {
+        "line": 3821,
+        "edgeId": "3820",
+        "fromNodeId": "4676",
+        "toNodeId": "4675",
+        "firstEdgeId": "3819"
+      },
+      {
+        "line": 4159,
+        "edgeId": "4158",
+        "fromNodeId": "5063",
+        "toNodeId": "5062",
+        "firstEdgeId": "4157"
+      },
+      {
+        "line": 4164,
+        "edgeId": "4163",
+        "fromNodeId": "5068",
+        "toNodeId": "5067",
+        "firstEdgeId": "4162"
+      },
+      {
+        "line": 4436,
+        "edgeId": "4435",
+        "fromNodeId": "3636",
+        "toNodeId": "3637",
+        "firstEdgeId": "2941"
+      },
+      {
+        "line": 4442,
+        "edgeId": "4441",
+        "fromNodeId": "3639",
+        "toNodeId": "3638",
+        "firstEdgeId": "2942"
+      }
+    ],
+    "selfLoops": [],
+    "isolatedNodes": [],
+    "largestComponents": [
+      {
+        "componentId": "2422",
+        "nodes": 8817,
+        "edges": 10626
+      },
+      {
+        "componentId": "501",
+        "nodes": 653,
+        "edges": 714
+      },
+      {
+        "componentId": "8036",
+        "nodes": 288,
+        "edges": 311
+      },
+      {
+        "componentId": "4684",
+        "nodes": 229,
+        "edges": 232
+      },
+      {
+        "componentId": "39304",
+        "nodes": 73,
+        "edges": 75
+      },
+      {
+        "componentId": "557",
+        "nodes": 71,
+        "edges": 73
+      },
+      {
+        "componentId": "25753",
+        "nodes": 72,
+        "edges": 71
+      },
+      {
+        "componentId": "48063",
+        "nodes": 70,
+        "edges": 70
+      },
+      {
+        "componentId": "7976",
+        "nodes": 69,
+        "edges": 70
+      },
+      {
+        "componentId": "1836",
+        "nodes": 69,
+        "edges": 69
+      }
+    ],
+    "smallComponents": [
+      {
+        "componentId": "45325",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "39769",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "24558",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "24381",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "17927",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "25991",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "36742",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "18467",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "26120",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "32651",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "25259",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "47075",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "16863",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "41334",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "5716",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "35253",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "19790",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "19061",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "43703",
+        "nodes": 6,
+        "edges": 5
+      },
+      {
+        "componentId": "24053",
+        "nodes": 6,
+        "edges": 5
+      }
+    ]
+  }
+}

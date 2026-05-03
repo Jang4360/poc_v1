@@ -1,0 +1,16 @@
+{
+  "inputSegments": "etl/raw/gangseo_road_segments_v8.csv",
+  "inputNodes": "etl/raw/gangseo_road_nodes_v8.csv",
+  "liveSegments": "runtime/graphhopper/topology/gangseo_all_v8_0_12_split_segments.csv",
+  "liveNodes": "runtime/graphhopper/topology/gangseo_all_v8_0_12_split_nodes.csv",
+  "finalSegments": "etl/raw/gangseo_road_segments_v9.csv",
+  "finalNodes": "etl/raw/gangseo_road_nodes_v9.csv",
+  "inputSegmentsCount": 47772,
+  "inputNodesCount": 50430,
+  "liveSegmentsCount": 50630,
+  "liveNodesCount": 47594,
+  "finalSegmentsCount": 50630,
+  "finalNodesCount": 47594,
+  "mergeRule": "Full Gangseo slice is the whole input graph, so final v9 is the current converged auto-preprocessed live slice. No proposed bridge was applied.",
+  "priority": "live slice rows are authoritative; node CSV contains only referenced nodes from live slice"
+}

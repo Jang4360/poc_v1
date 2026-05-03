@@ -1,0 +1,438 @@
+{
+  "iterations": [
+    {
+      "iteration": 2,
+      "inputCandidates": 174,
+      "inputLowPriorityCandidates": 30,
+      "inputNodeMergeCandidates": 489,
+      "applyReport": {
+        "sourceSegments": 50525,
+        "sourceNodes": 48054,
+        "acceptedEndpointCandidates": 66,
+        "acceptedOrangeCandidates": 66,
+        "acceptedRedCandidates": 0,
+        "acceptedYellowCandidates": 138,
+        "appliedNodeMerges": 489,
+        "newSplitNodes": 133,
+        "yellowNodeMerges": 138,
+        "addedOrangeConnectors": 66,
+        "addedYellowConnectors": 0,
+        "removedOriginalSplitEdges": 125,
+        "removedSelfLoops": 53,
+        "removedShortEdges": 12,
+        "removedDuplicates": 39,
+        "outputSegments": 50620,
+        "outputNodes": 47600,
+        "skipped": 0
+      },
+      "validateSummary": {
+        "segments": 50620,
+        "nodes": 47600,
+        "segmentTypes": {
+          "SIDE_LINE": 47889,
+          "SIDE_WALK": 2731
+        },
+        "missingSegmentColumns": [],
+        "missingNodeColumns": [],
+        "badNodeGeometries": 0,
+        "duplicateNodeIds": 0,
+        "badNodeReferences": 0,
+        "badSegmentGeometries": 0,
+        "endpointMismatches": 0,
+        "enumViolationColumns": {},
+        "duplicateEdgeIds": 0,
+        "duplicateNodePairEdges": 30,
+        "selfLoops": 0,
+        "referencedNodes": 47600,
+        "isolatedNodes": 0,
+        "connectedComponents": 1597,
+        "smallComponents": 717,
+        "componentEdgeBins": {
+          ">100": 32,
+          "51-100": 50,
+          "11-50": 452,
+          "6-10": 346,
+          "2-5": 625,
+          "1": 92
+        },
+        "largestComponentEdges": 17850,
+        "largestComponentEdgeRatio": 0.352627,
+        "smallComponentEdges": 2398
+      },
+      "nextAnalysisSummary": {
+        "segmentCount": 50620,
+        "nodeCount": 47600,
+        "componentCount": 1597,
+        "endpointCount": 2811,
+        "candidateCount": 8,
+        "generatedCandidateCount": 8,
+        "candidateOutputTruncated": false,
+        "nodeMergeCandidateCount": 8,
+        "lowPriorityCandidateCount": 102,
+        "blockedEndpointCount": 11,
+        "candidateTypeCounts": {
+          "SPLIT_AND_CONNECT": 5,
+          "ENDPOINT_TO_ENDPOINT": 3
+        },
+        "candidateColorCounts": {
+          "yellow": 5,
+          "orange": 3
+        },
+        "largestComponents": [
+          {
+            "componentId": "2422",
+            "nodeCount": 15619,
+            "edgeCount": 17864,
+            "endpointCount": 909,
+            "bbox": [
+              128.79314,
+              35.023294,
+              128.995976,
+              35.23384641
+            ]
+          },
+          {
+            "componentId": "21761",
+            "nodeCount": 1635,
+            "edgeCount": 1847,
+            "endpointCount": 67,
+            "bbox": [
+              128.851164,
+              35.1353818,
+              128.895787,
+              35.1681888
+            ]
+          },
+          {
+            "componentId": "18135",
+            "nodeCount": 1624,
+            "edgeCount": 1767,
+            "endpointCount": 92,
+            "bbox": [
+              128.799098,
+              35.101449,
+              128.87514864,
+              35.156817
+            ]
+          },
+          {
+            "componentId": "27220",
+            "nodeCount": 1356,
+            "edgeCount": 1422,
+            "endpointCount": 54,
+            "bbox": [
+              128.894715,
+              35.1678455,
+              128.97094917,
+              35.224883
+            ]
+          },
+          {
+            "componentId": "15511",
+            "nodeCount": 1087,
+            "edgeCount": 1122,
+            "endpointCount": 41,
+            "bbox": [
+              128.82622019,
+              35.04256258,
+              128.852771,
+              35.06887538
+            ]
+          },
+          {
+            "componentId": "24698",
+            "nodeCount": 946,
+            "edgeCount": 976,
+            "endpointCount": 20,
+            "bbox": [
+              128.805608,
+              34.993099,
+              128.835657,
+              35.02897555
+            ]
+          },
+          {
+            "componentId": "41066",
+            "nodeCount": 680,
+            "edgeCount": 748,
+            "endpointCount": 33,
+            "bbox": [
+              128.94293692,
+              35.1565836,
+              128.96001282,
+              35.17340453
+            ]
+          },
+          {
+            "componentId": "39249",
+            "nodeCount": 705,
+            "edgeCount": 731,
+            "endpointCount": 26,
+            "bbox": [
+              128.92999757,
+              35.19697427,
+              128.95087277,
+              35.22462982
+            ]
+          },
+          {
+            "componentId": "40438",
+            "nodeCount": 618,
+            "edgeCount": 659,
+            "endpointCount": 32,
+            "bbox": [
+              128.95297575,
+              35.208521,
+              128.97024547,
+              35.22144736
+            ]
+          },
+          {
+            "componentId": "1262",
+            "nodeCount": 431,
+            "edgeCount": 515,
+            "endpointCount": 26,
+            "bbox": [
+              128.908913,
+              35.12777309,
+              128.924744,
+              35.14820949
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "iteration": 3,
+      "inputCandidates": 8,
+      "inputLowPriorityCandidates": 2,
+      "inputNodeMergeCandidates": 8,
+      "applyReport": {
+        "sourceSegments": 50620,
+        "sourceNodes": 47600,
+        "acceptedEndpointCandidates": 5,
+        "acceptedOrangeCandidates": 5,
+        "acceptedRedCandidates": 0,
+        "acceptedYellowCandidates": 5,
+        "appliedNodeMerges": 8,
+        "newSplitNodes": 5,
+        "yellowNodeMerges": 5,
+        "addedOrangeConnectors": 5,
+        "addedYellowConnectors": 0,
+        "removedOriginalSplitEdges": 5,
+        "removedSelfLoops": 0,
+        "removedShortEdges": 0,
+        "removedDuplicates": 0,
+        "outputSegments": 50630,
+        "outputNodes": 47594,
+        "skipped": 0
+      },
+      "validateSummary": {
+        "segments": 50630,
+        "nodes": 47594,
+        "segmentTypes": {
+          "SIDE_LINE": 47899,
+          "SIDE_WALK": 2731
+        },
+        "missingSegmentColumns": [],
+        "missingNodeColumns": [],
+        "badNodeGeometries": 0,
+        "duplicateNodeIds": 0,
+        "badNodeReferences": 0,
+        "badSegmentGeometries": 0,
+        "endpointMismatches": 0,
+        "enumViolationColumns": {},
+        "duplicateEdgeIds": 0,
+        "duplicateNodePairEdges": 30,
+        "selfLoops": 0,
+        "referencedNodes": 47594,
+        "isolatedNodes": 0,
+        "connectedComponents": 1582,
+        "smallComponents": 712,
+        "componentEdgeBins": {
+          ">100": 35,
+          "51-100": 47,
+          "11-50": 446,
+          "6-10": 342,
+          "2-5": 620,
+          "1": 92
+        },
+        "largestComponentEdges": 17882,
+        "largestComponentEdgeRatio": 0.35319,
+        "smallComponentEdges": 2381
+      },
+      "nextAnalysisSummary": {
+        "segmentCount": 50630,
+        "nodeCount": 47594,
+        "componentCount": 1582,
+        "endpointCount": 2791,
+        "candidateCount": 0,
+        "generatedCandidateCount": 0,
+        "candidateOutputTruncated": false,
+        "nodeMergeCandidateCount": 0,
+        "lowPriorityCandidateCount": 96,
+        "blockedEndpointCount": 0,
+        "candidateTypeCounts": {},
+        "candidateColorCounts": {},
+        "largestComponents": [
+          {
+            "componentId": "2422",
+            "nodeCount": 15650,
+            "edgeCount": 17896,
+            "endpointCount": 910,
+            "bbox": [
+              128.79314,
+              35.023294,
+              128.995976,
+              35.23384641
+            ]
+          },
+          {
+            "componentId": "21761",
+            "nodeCount": 1635,
+            "edgeCount": 1847,
+            "endpointCount": 67,
+            "bbox": [
+              128.851164,
+              35.1353818,
+              128.895787,
+              35.1681888
+            ]
+          },
+          {
+            "componentId": "18135",
+            "nodeCount": 1626,
+            "edgeCount": 1770,
+            "endpointCount": 91,
+            "bbox": [
+              128.799098,
+              35.101449,
+              128.87514864,
+              35.156817
+            ]
+          },
+          {
+            "componentId": "27220",
+            "nodeCount": 1356,
+            "edgeCount": 1422,
+            "endpointCount": 54,
+            "bbox": [
+              128.894715,
+              35.1678455,
+              128.97094917,
+              35.224883
+            ]
+          },
+          {
+            "componentId": "15511",
+            "nodeCount": 1093,
+            "edgeCount": 1129,
+            "endpointCount": 40,
+            "bbox": [
+              128.82622019,
+              35.04256258,
+              128.852771,
+              35.06887538
+            ]
+          },
+          {
+            "componentId": "24698",
+            "nodeCount": 993,
+            "edgeCount": 1024,
+            "endpointCount": 20,
+            "bbox": [
+              128.805608,
+              34.993099,
+              128.835657,
+              35.02897555
+            ]
+          },
+          {
+            "componentId": "41066",
+            "nodeCount": 680,
+            "edgeCount": 748,
+            "endpointCount": 33,
+            "bbox": [
+              128.94293692,
+              35.1565836,
+              128.96001282,
+              35.17340453
+            ]
+          },
+          {
+            "componentId": "39249",
+            "nodeCount": 705,
+            "edgeCount": 731,
+            "endpointCount": 26,
+            "bbox": [
+              128.92999757,
+              35.19697427,
+              128.95087277,
+              35.22462982
+            ]
+          },
+          {
+            "componentId": "40438",
+            "nodeCount": 618,
+            "edgeCount": 659,
+            "endpointCount": 32,
+            "bbox": [
+              128.95297575,
+              35.208521,
+              128.97024547,
+              35.22144736
+            ]
+          },
+          {
+            "componentId": "1262",
+            "nodeCount": 431,
+            "edgeCount": 515,
+            "endpointCount": 26,
+            "bbox": [
+              128.908913,
+              35.12777309,
+              128.924744,
+              35.14820949
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "acceptedEndpointCandidates": 2162,
+  "acceptedOrangeCandidates": 2162,
+  "acceptedRedCandidates": 0,
+  "acceptedYellowCandidates": 1781,
+  "appliedNodeMerges": 2928,
+  "newSplitNodes": 1759,
+  "yellowNodeMerges": 1781,
+  "addedOrangeConnectors": 2162,
+  "addedYellowConnectors": 0,
+  "removedOriginalSplitEdges": 1345,
+  "removedSelfLoops": 137,
+  "removedShortEdges": 229,
+  "removedDuplicates": 697,
+  "skipped": 0,
+  "firstPassReport": {
+    "sourceSegments": 47772,
+    "sourceNodes": 50430,
+    "acceptedEndpointCandidates": 2091,
+    "acceptedOrangeCandidates": 2091,
+    "acceptedRedCandidates": 0,
+    "acceptedYellowCandidates": 1638,
+    "appliedNodeMerges": 2431,
+    "newSplitNodes": 1621,
+    "yellowNodeMerges": 1638,
+    "addedOrangeConnectors": 2091,
+    "addedYellowConnectors": 0,
+    "removedOriginalSplitEdges": 1215,
+    "removedSelfLoops": 84,
+    "removedShortEdges": 217,
+    "removedDuplicates": 658,
+    "outputSegments": 50525,
+    "outputNodes": 48054,
+    "skipped": 0
+  },
+  "finalSegments": 50630,
+  "finalNodes": 47594
+}

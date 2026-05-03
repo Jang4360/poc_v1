@@ -1,0 +1,13 @@
+{
+  "sourceSegments": "etl/raw/gangseo_road_segments_v8.csv",
+  "sourceNodes": "etl/raw/gangseo_road_nodes_v8.csv",
+  "outputSegments": "runtime/graphhopper/topology/gangseo_all_v8_segments.csv",
+  "outputNodes": "runtime/graphhopper/topology/gangseo_all_v8_nodes.csv",
+  "regionLabel": "gangseo_all_v8",
+  "targetAreas": "강서구 전체; previous four-dong+1km scope is included so cross-scope connectors can be reviewed",
+  "bufferMeter": 1000,
+  "bridgeMaxDistanceMeter": 1000,
+  "segmentCount": 47772,
+  "nodeCount": 50430,
+  "sliceRule": "full Gangseo v8 graph copied as presliced editor input"
+}

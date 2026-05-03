@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gangseo Mapping Gap Overlay</title>
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .panel {
+      position: absolute;
+      z-index: 10;
+      top: 12px;
+      left: 12px;
+      width: 330px;
+      max-height: calc(100vh - 24px);
+      overflow: auto;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+      padding: 12px;
+      color: #111827;
+    }
+    .route-panel {
+      left: auto;
+      right: 12px;
+      width: 360px;
+    }
+    @media (max-width: 760px) {
+      .panel {
+        left: 8px;
+        right: 8px;
+        width: auto;
+        max-height: 45vh;
+      }
+      .route-panel {
+        top: auto;
+        bottom: 8px;
+        left: 8px;
+        right: 8px;
+        width: auto;
+        max-height: 58vh;
+      }
+      .field-row {
+        grid-template-columns: 74px 1fr 1fr;
+      }
+    }
+    h1 { font-size: 16px; margin: 0 0 10px; }
+    h2 { font-size: 14px; margin: 14px 0 8px; }
+    code { font-size: 11px; }
+    .meta { font-size: 12px; color: #4b5563; line-height: 1.4; margin-bottom: 10px; }
+    .row { display: flex; align-items: center; gap: 8px; margin: 7px 0; font-size: 13px; }
+    .row input { width: 16px; height: 16px; }
+    .field-row {
+      display: grid;
+      grid-template-columns: 86px 1fr 1fr;
+      gap: 6px;
+      align-items: center;
+      margin: 7px 0;
+      font-size: 12px;
+    }
+    .field-row input, .field-row select {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 6px 7px;
+      font: inherit;
+      background: #fff;
+      color: #111827;
+    }
+    .button-row { display: flex; gap: 7px; margin-top: 9px; }
+    button {
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      background: #fff;
+      color: #111827;
+      padding: 7px 9px;
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    button.primary {
+      border-color: #2563eb;
+      background: #2563eb;
+      color: #fff;
+    }
+    button.active {
+      border-color: #111827;
+      background: #111827;
+      color: #fff;
+    }
+    .swatch { width: 14px; height: 4px; display: inline-block; border-radius: 2px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+    th, td { border-top: 1px solid #e5e7eb; padding: 5px 3px; text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+    .status { margin-top: 10px; font-size: 12px; color: #374151; }
+    .route-status { min-height: 16px; }
+    .route-results {
+      display: grid;
+      gap: 7px;
+      margin-top: 10px;
+      font-size: 12px;
+    }
+    .route-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 8px;
+      background: #f9fafb;
+    }
+    .route-card strong { display: block; font-size: 13px; margin-bottom: 5px; }
+    .route-card dl {
+      display: grid;
+      grid-template-columns: 90px 1fr;
+      gap: 3px 8px;
+      margin: 0;
+    }
+    .route-card dt { color: #6b7280; }
+    .route-card dd {
+      min-width: 0;
+      margin: 0;
+      color: #111827;
+      overflow-wrap: anywhere;
+    }
+    .route-marker {
+      min-width: 24px;
+      height: 24px;
+      padding: 0 6px;
+      border-radius: 999px;
+      border: 2px solid #fff;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.35);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      transform: translate(-50%, -50%);
+    }
+    .dot {
+      width: 12px;
+      height: 12px;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+      transform: translate(-50%, -50%);
+    }
+    .dot.stairs { width: 14px; height: 14px; }
+    .popup {
+      max-width: 320px;
+      max-height: 260px;
+      overflow: auto;
+      background: #fff;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2);
+      padding: 8px;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .popup table { margin-top: 0; }
+    .popup td { text-align: left; vertical-align: top; border-top: 1px solid #e5e7eb; padding: 3px 4px; }
+    .popup td:first-child { color: #6b7280; white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="panel">
+    <h1>Gangseo Mapping Gap Overlay</h1>
+    <div class="meta">
+      Base: <code>gangseo_road_segments_mapping_v2.csv</code><br />
+      Basemap: Kakao Maps SDK<br />
+      Overlay: 매핑 반경 밖에 남은 원천 데이터
+    </div>
+    <label class="row"><input type="checkbox" data-layer="sidewalk" checked><span class="swatch" style="background:#16a34a"></span>인도/인도폭 미매핑</label>
+    <label class="row"><input type="checkbox" data-layer="local" checked><span class="swatch" style="background:#64748b"></span>이면도로 미매핑</label>
+    <label class="row"><input type="checkbox" data-layer="slope" checked><span class="swatch" style="background:#f97316"></span>경사도/표면 미매핑</label>
+    <label class="row"><input type="checkbox" data-layer="audio" checked><span class="swatch" style="background:#8b5cf6"></span>음향신호기 미매핑</label>
+    <label class="row"><input type="checkbox" data-layer="signal" checked><span class="swatch" style="background:#ef4444"></span>횡단보도 신호등 미매핑</label>
+    <label class="row"><input type="checkbox" data-layer="stairs" checked><span class="swatch" style="background:#111827"></span>계단 미매핑</label>
+    <table id="summary">
+      <thead><tr><th>Layer</th><th>원천</th><th>미매핑</th><th>현재뷰</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="status" id="status">loading Kakao map...</div>
+  </div>
+  <div class="panel route-panel">
+    <h1>Route Verification</h1>
+    <div class="meta">
+      API: <code>/api/v1/routes/search</code><br />
+      Overlay route geometry from GraphHopper profiles
+    </div>
+    <div class="field-row">
+      <span>Type</span>
+      <select id="routeDisability">
+        <option value="VISUAL">VISUAL</option>
+        <option value="MOBILITY">MOBILITY</option>
+      </select>
+      <select id="routeMode">
+        <option value="COMPARE">COMPARE</option>
+        <option value="SAFE">SAFE</option>
+        <option value="SHORTEST">FAST</option>
+      </select>
+    </div>
+    <div class="field-row">
+      <span>Origin</span>
+      <input id="originLat" inputmode="decimal" value="35.083322" aria-label="origin latitude" />
+      <input id="originLon" inputmode="decimal" value="128.818527" aria-label="origin longitude" />
+    </div>
+    <div class="field-row">
+      <span>Destination</span>
+      <input id="destinationLat" inputmode="decimal" value="35.130342" aria-label="destination latitude" />
+      <input id="destinationLon" inputmode="decimal" value="128.943911" aria-label="destination longitude" />
+    </div>
+    <div class="button-row">
+      <button id="setOriginBtn" type="button">Set origin</button>
+      <button id="setDestinationBtn" type="button">Set destination</button>
+      <button id="routeBtn" type="button" class="primary">Route</button>
+      <button id="clearRouteBtn" type="button">Clear</button>
+    </div>
+    <div class="status route-status" id="routeStatus">ready</div>
+    <div class="route-results" id="routeResults"></div>
+  </div>
+
+  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=fc0455f117ec0c48766f39c9673f18f0&autoload=false"></script>
+  <script>
+    const colors = {
+      sidewalk: "#16a34a",
+      local: "#64748b",
+      slope: "#f97316",
+      audio: "#8b5cf6",
+      signal: "#ef4444",
+      stairs: "#111827"
+    };
+
+    let map = null;
+    let infoWindow = null;
+    let loadedOnce = false;
+    let lastSummary = [];
+    let routeClickMode = null;
+    const dataOrigin = (location.protocol === "file:" || location.port === "3000")
+      ? "http://127.0.0.1:3001"
+      : "";
+    const routeColors = {
+      SAFE: "#2563eb",
+      SHORTEST: "#ea580c",
+      PUBLIC_TRANSPORT: "#7c3aed"
+    };
+    const baseObjects = [];
+    const overlayObjects = {};
+    const routeObjects = [];
+    for (const key of Object.keys(colors)) overlayObjects[key] = [];
+
+    function init() {
+      if (!window.kakao || !window.kakao.maps) {
+        document.getElementById("status").textContent = "Kakao Maps SDK load failed. Open this page through http://localhost:3000.";
+        return;
+      }
+      kakao.maps.load(() => {
+        map = new kakao.maps.Map(document.getElementById("map"), {
+          center: new kakao.maps.LatLng(35.13, 128.92),
+          level: 8
+        });
+        infoWindow = new kakao.maps.InfoWindow({ removable: true });
+        kakao.maps.event.addListener(map, "idle", scheduleRefresh);
+        kakao.maps.event.addListener(map, "click", handleMapClickForRoute);
+        document.querySelectorAll("input[data-layer]").forEach(el => el.addEventListener("change", scheduleRefresh));
+        setupRouteControls();
+        updateRouteMarkers();
+        refresh().catch(error => document.getElementById("status").textContent = error.message);
+      });
+    }
+
+    function bboxParam() {
+      const b = map.getBounds();
+      const sw = b.getSouthWest();
+      const ne = b.getNorthEast();
+      return [sw.getLng(), sw.getLat(), ne.getLng(), ne.getLat()].map(v => v.toFixed(7)).join(",");
+    }
+
+    function selectedLayers() {
+      return [...document.querySelectorAll("input[data-layer]:checked")].map(el => el.dataset.layer);
+    }
+
+    async function refresh() {
+      if (!map) return;
+      const layers = selectedLayers();
+      document.getElementById("status").textContent = "loading viewport...";
+      const response = await fetch(`${dataOrigin}/api/gangseo-mapping-gap-data?bbox=${encodeURIComponent(bboxParam())}&layers=${encodeURIComponent(layers.join(","))}&limit=7000`);
+      const payload = await response.json();
+      if (!payload.ok) throw new Error(payload.error || "load failed");
+
+      clearObjects(baseObjects);
+      for (const key of Object.keys(overlayObjects)) clearObjects(overlayObjects[key]);
+
+      addFeatureCollection(payload.base, baseObjects, baseStyle);
+      for (const [key, collection] of Object.entries(payload.unmatched || {})) {
+        addFeatureCollection(collection, overlayObjects[key], feature => overlayStyle(key, feature));
+      }
+
+      lastSummary = payload.summary;
+      renderSummary(payload);
+      document.getElementById("status").textContent = `base ${payload.base.returned}/${payload.base.totalInBbox}, updated ${new Date().toLocaleTimeString()}`;
+      if (!loadedOnce) {
+        loadedOnce = true;
+        const [minLng, minLat, maxLng, maxLat] = payload.fullBBox;
+        const bounds = new kakao.maps.LatLngBounds();
+        bounds.extend(new kakao.maps.LatLng(minLat, minLng));
+        bounds.extend(new kakao.maps.LatLng(maxLat, maxLng));
+        map.setBounds(bounds);
+      }
+    }
+
+    function clearObjects(objects) {
+      while (objects.length) {
+        const obj = objects.pop();
+        obj.setMap(null);
+      }
+    }
+
+    function addFeatureCollection(collection, bucket, styleFactory) {
+      for (const feature of collection.features || []) {
+        const style = styleFactory(feature);
+        for (const obj of drawFeature(feature, style)) {
+          obj.setMap(map);
+          bucket.push(obj);
+        }
+      }
+    }
+
+    function baseStyle(feature) {
+      const segmentType = feature.properties.segmentType;
+      const isSupportedBase = segmentType === "SIDE_WALK" || segmentType === "SIDE_LINE";
+      return {
+        color: isSupportedBase ? "#000000" : "#9ca3af",
+        weight: isSupportedBase ? 3 : 1,
+        opacity: isSupportedBase ? 0.9 : 0.4,
+        point: false
+      };
+    }
+
+    function overlayStyle(key) {
+      return {
+        color: colors[key],
+        weight: key === "stairs" ? 0 : 4,
+        opacity: 0.9,
+        point: true,
+        pointClass: key
+      };
+    }
+
+    function drawFeature(feature, style) {
+      const geometry = feature.geometry || {};
+      if (geometry.type === "LineString") {
+        return [drawLine(feature, geometry.coordinates, style)];
+      }
+      if (geometry.type === "MultiLineString") {
+        return geometry.coordinates.map(coords => drawLine(feature, coords, style));
+      }
+      if (geometry.type === "Point") {
+        return [drawPoint(feature, geometry.coordinates, style)];
+      }
+      return [];
+    }
+
+    function drawLine(feature, coords, style) {
+      const path = coords.map(([lng, lat]) => new kakao.maps.LatLng(lat, lng));
+      const line = new kakao.maps.Polyline({
+        path,
+        strokeWeight: style.weight,
+        strokeColor: style.color,
+        strokeOpacity: style.opacity,
+        strokeStyle: "solid"
+      });
+      kakao.maps.event.addListener(line, "click", mouseEvent => {
+        openInfo(mouseEvent.latLng, feature.properties);
+      });
+      return line;
+    }
+
+    function drawPoint(feature, coord, style) {
+      const [lng, lat] = coord;
+      const position = new kakao.maps.LatLng(lat, lng);
+      const content = document.createElement("div");
+      content.className = `dot ${style.pointClass || ""}`;
+      content.style.background = style.color;
+      content.addEventListener("click", () => openInfo(position, feature.properties));
+      const overlay = new kakao.maps.CustomOverlay({
+        position,
+        content,
+        yAnchor: 0.5,
+        xAnchor: 0.5,
+        clickable: true
+      });
+      return overlay;
+    }
+
+    function openInfo(position, props) {
+      infoWindow.setContent(`<div class="popup">${popupHtml(props)}</div>`);
+      infoWindow.setPosition(position);
+      infoWindow.open(map);
+    }
+
+    function popupHtml(props) {
+      const rows = Object.entries(props || {})
+        .filter(([, value]) => value !== "" && value !== null && value !== undefined)
+        .map(([key, value]) => `<tr><td>${escapeHtml(key)}</td><td>${escapeHtml(String(value))}</td></tr>`)
+        .join("");
+      return `<table>${rows}</table>`;
+    }
+
+    function escapeHtml(text) {
+      return text.replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+    }
+
+    function renderSummary(payload) {
+      const body = document.querySelector("#summary tbody");
+      body.innerHTML = "";
+      for (const item of lastSummary) {
+        const view = payload.unmatched[item.key]?.totalInBbox || 0;
+        const row = document.createElement("tr");
+        row.innerHTML = `<td>${escapeHtml(item.key)}</td><td>${item.sourceRows}</td><td>${item.unmappedRows}</td><td>${view}</td>`;
+        body.appendChild(row);
+      }
+    }
+
+    function setupRouteControls() {
+      document.getElementById("routeBtn").addEventListener("click", () => runRouteSearch().catch(error => {
+        document.getElementById("routeStatus").textContent = error.message;
+      }));
+      document.getElementById("clearRouteBtn").addEventListener("click", clearRoute);
+      document.getElementById("setOriginBtn").addEventListener("click", () => setRouteClickMode("origin"));
+      document.getElementById("setDestinationBtn").addEventListener("click", () => setRouteClickMode("destination"));
+      for (const id of ["originLat", "originLon", "destinationLat", "destinationLon"]) {
+        document.getElementById(id).addEventListener("change", updateRouteMarkers);
+      }
+    }
+
+    function setRouteClickMode(mode) {
+      routeClickMode = routeClickMode === mode ? null : mode;
+      document.getElementById("setOriginBtn").classList.toggle("active", routeClickMode === "origin");
+      document.getElementById("setDestinationBtn").classList.toggle("active", routeClickMode === "destination");
+      document.getElementById("routeStatus").textContent = routeClickMode ? `click map to set ${routeClickMode}` : "ready";
+    }
+
+    function handleMapClickForRoute(mouseEvent) {
+      if (!routeClickMode) return;
+      const latLng = mouseEvent.latLng;
+      const prefix = routeClickMode === "origin" ? "origin" : "destination";
+      document.getElementById(`${prefix}Lat`).value = latLng.getLat().toFixed(6);
+      document.getElementById(`${prefix}Lon`).value = latLng.getLng().toFixed(6);
+      setRouteClickMode(null);
+      updateRouteMarkers();
+    }
+
+    function routePoint(prefix) {
+      const lat = Number(document.getElementById(`${prefix}Lat`).value);
+      const lon = Number(document.getElementById(`${prefix}Lon`).value);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        throw new Error(`${prefix} coordinate is invalid`);
+      }
+      return { lat, lon };
+    }
+
+    async function runRouteSearch() {
+      const disabilityType = document.getElementById("routeDisability").value;
+      const mode = document.getElementById("routeMode").value;
+      const body = {
+        disabilityType,
+        origin: routePoint("origin"),
+        destination: routePoint("destination")
+      };
+      if (mode !== "COMPARE") body.routeOption = mode;
+      document.getElementById("routeStatus").textContent = "routing...";
+      document.getElementById("routeResults").innerHTML = "";
+      clearRouteLinesOnly();
+      updateRouteMarkers();
+      const response = await fetch(`${dataOrigin}/api/gangseo-route-search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || payload.detail || "route request failed");
+      }
+      drawRoutes(payload.routes || []);
+      renderRouteResults(payload.routes || []);
+      document.getElementById("routeStatus").textContent = `${payload.routes?.length || 0} route result(s)`;
+    }
+
+    function clearRoute() {
+      clearObjects(routeObjects);
+      document.getElementById("routeResults").innerHTML = "";
+      document.getElementById("routeStatus").textContent = "ready";
+    }
+
+    function clearRouteLinesOnly() {
+      for (let index = routeObjects.length - 1; index >= 0; index--) {
+        const obj = routeObjects[index];
+        if (obj.__routeKind === "line") {
+          obj.setMap(null);
+          routeObjects.splice(index, 1);
+        }
+      }
+    }
+
+    function updateRouteMarkers() {
+      for (let index = routeObjects.length - 1; index >= 0; index--) {
+        const obj = routeObjects[index];
+        if (obj.__routeKind === "marker") {
+          obj.setMap(null);
+          routeObjects.splice(index, 1);
+        }
+      }
+      try {
+        addRouteMarker("O", routePoint("origin"), "#2563eb");
+        addRouteMarker("D", routePoint("destination"), "#dc2626");
+      } catch {
+        // Keep invalid coordinates editable without interrupting map rendering.
+      }
+    }
+
+    function addRouteMarker(label, point, color) {
+      const content = document.createElement("div");
+      content.className = "route-marker";
+      content.textContent = label;
+      content.style.background = color;
+      const overlay = new kakao.maps.CustomOverlay({
+        position: new kakao.maps.LatLng(point.lat, point.lon),
+        content,
+        yAnchor: 0.5,
+        xAnchor: 0.5,
+        clickable: true
+      });
+      overlay.__routeKind = "marker";
+      overlay.setMap(map);
+      routeObjects.push(overlay);
+    }
+
+    function drawRoutes(routes) {
+      const bounds = new kakao.maps.LatLngBounds();
+      let hasRoute = false;
+      for (const route of routes) {
+        if (!route.available || !route.geometry || route.geometry.type !== "LineString") continue;
+        const color = routeColors[route.routeOption] || "#2563eb";
+        const path = route.geometry.coordinates.map(([lng, lat]) => {
+          const latLng = new kakao.maps.LatLng(lat, lng);
+          bounds.extend(latLng);
+          return latLng;
+        });
+        if (path.length < 2) continue;
+        const line = new kakao.maps.Polyline({
+          path,
+          strokeWeight: route.routeOption === "SAFE" ? 6 : 5,
+          strokeColor: color,
+          strokeOpacity: 0.88,
+          strokeStyle: route.routeOption === "SHORTEST" ? "shortdash" : "solid"
+        });
+        kakao.maps.event.addListener(line, "click", mouseEvent => {
+          openInfo(mouseEvent.latLng, {
+            routeOption: route.routeOption,
+            profile: route.graphhopperProfile,
+            distanceMeter: route.summary?.distanceMeter,
+            timeMinute: route.summary ? Math.round(route.summary.timeMs / 60000) : ""
+          });
+        });
+        line.__routeKind = "line";
+        line.setMap(map);
+        routeObjects.push(line);
+        hasRoute = true;
+      }
+      if (hasRoute) map.setBounds(bounds);
+    }
+
+    function renderRouteResults(routes) {
+      const container = document.getElementById("routeResults");
+      container.innerHTML = "";
+      for (const route of routes) {
+        const card = document.createElement("div");
+        card.className = "route-card";
+        const color = routeColors[route.routeOption] || "#111827";
+        if (!route.available) {
+          card.innerHTML = `<strong style="color:${color}">${escapeHtml(route.routeOption)}</strong><dl><dt>profile</dt><dd>${escapeHtml(route.graphhopperProfile || "-")}</dd><dt>status</dt><dd>${escapeHtml(route.reason || "unavailable")}</dd></dl>`;
+          container.appendChild(card);
+          continue;
+        }
+        const detailSummary = summarizeRouteDetails(route.details || {});
+        const km = (route.summary.distanceMeter / 1000).toFixed(2);
+        const minutes = Math.round(route.summary.timeMs / 60000);
+        card.innerHTML = `
+          <strong style="color:${color}">${escapeHtml(route.routeOption)} · ${escapeHtml(route.graphhopperProfile)}</strong>
+          <dl>
+            <dt>distance</dt><dd>${km} km</dd>
+            <dt>time</dt><dd>${minutes} min</dd>
+            <dt>weight</dt><dd>${Number(route.summary.weight).toFixed(2)}</dd>
+            <dt>instructions</dt><dd>${route.instructions.length}</dd>
+            <dt>details</dt><dd>${escapeHtml(detailSummary)}</dd>
+          </dl>`;
+        container.appendChild(card);
+      }
+    }
+
+    function summarizeRouteDetails(details) {
+      const keys = ["stairs_state", "slope_state", "width_state", "surface_state", "signal_state"];
+      return keys
+        .filter(key => Array.isArray(details[key]))
+        .map(key => `${key}:${detailValues(details[key]).slice(0, 3).join("/")}`)
+        .join(", ");
+    }
+
+    function detailValues(items) {
+      const values = [];
+      for (const item of items) {
+        const value = Array.isArray(item) ? item[2] : item.value;
+        if (value !== undefined && !values.includes(String(value))) values.push(String(value));
+      }
+      return values;
+    }
+
+    let timer = null;
+    function scheduleRefresh() {
+      clearTimeout(timer);
+      timer = setTimeout(() => refresh().catch(error => {
+        document.getElementById("status").textContent = error.message;
+      }), 250);
+    }
+
+    init();
+  </script>
+</body>
+</html>
