@@ -72,6 +72,7 @@
 - [ ] [04-graphhopper-routing-profiles_v2.md](.ai/PLANS/current-sprint/04-graphhopper-routing-profiles_v2.md)
 - [ ] [05-backend-api-and-orchestration.md](.ai/PLANS/current-sprint/05-backend-api-and-orchestration.md)
 - [ ] [06-validation-demo-and-v2-boundary.md](.ai/PLANS/current-sprint/06-validation-demo-and-v2-boundary.md)
+- [ ] [07-graphhopper-common-flow.md](.ai/PLANS/current-sprint/07-graphhopper-common-flow.md)
 
 Planning guard for real service: all downstream ETL, GraphHopper import, and verification flows must use the same canonical `edgeId` handoff contract. The network load stage should stay split as `preflight -> extract -> topology-audit -> load-db -> post-load-validate -> visualize-html` so schema drift, graph connectivity defects, or empty DB loads fail before downstream work starts.
 
@@ -154,3 +155,60 @@ Planning guard for real service: all downstream ETL, GraphHopper import, and ver
   - Editor coverage: the Gangseo selector now includes the full v5 CSV extent plus additional Gangseo bbox work areas beyond the original four: 송정동, 미음동, 지사동, 생곡동, 범방동, 구랑동, 가락동, 강동동, 대저1동, 대저2동, 공항동, 가덕도동.
   - Validation: `python -m pytest etl/tests/test_segment_centerline_02c.py etl/tests/test_segment_graph_edit_ui.py etl/tests/test_road_boundary_csv_export.py etl/tests/test_district_road_boundary_from_polygons.py -q` passed; `scripts/verify.sh` passed.
   - Accepted risk: direct full-radius `etl.scripts.13_generate_segment_02c_centerline --variant road-boundary` for Gangseo timed out in the large union stage, so v4 generation used the prepared `poc_submit` Gangseo road-polygon asset as the road-surface input before union and boundary extraction. Retry was recorded as `gangseo-road-boundary-v2-radius-18000-union-timeout`.
+- [x] 2026-05-02: 4개 동 graph 편집 UI를 신호동 connector 검수 레이어와 통합했다.
+  - UI: `etl/noksan_sinho_songjeong_hwajeon_segment_02c_graph_edit.html` now removes the dong selector and loads a combined `신호동/녹산동/명지동/화전동` payload by default.
+  - Connector overlay: the top toolbar now includes layer toggles for 기존 segment, 0-12m connector, 12-20m connector, split connector, and proposed bridge; 4개 동 v7 preview candidates live in `runtime/graphhopper/topology/gangseo_four_dong_v7_connectivity_analysis_with_bridges.json`.
+  - API: `etl/scripts/27_serve_gangseo_connector_editor.py` now serves both connector JSON API and `/api/segment-02c/payload?dong=gangseo_four` plus `/api/segment-02c/apply-edits` from CSV without requiring DB dependencies.
+  - Preview state: v7 source remains untouched; current server is pointed at `gangseo_four_dong_road_segments_v7_preview.csv` / `gangseo_four_dong_road_nodes_v7_preview.csv` for map verification.
+  - Validation: `python3 -m py_compile etl/scripts/27_serve_gangseo_connector_editor.py`, HTML script `node --check`, and API smoke passed with 3,242 visible connector candidates: orange 157, red 77, yellow 2,915, blue bridge 93.
+- [x] 2026-05-03: 4개 동 v7 원본에 0-12m connector와 split connector를 반영하고, 남은 검수 후보를 재계산했다.
+  - Applied to source CSV: `etl/raw/gangseo_road_segments_v7.csv` and `etl/raw/gangseo_road_nodes_v7.csv`.
+  - Backup before apply: `runtime/graphhopper/topology/backups/gangseo_road_segments_v7_before_0_12_split_20260503.csv` and `runtime/graphhopper/topology/backups/gangseo_road_nodes_v7_before_0_12_split_20260503.csv`.
+  - Scope control: only the 4-dong slice was replaced in v7; non-slice Gangseo rows were preserved instead of running global cleanup over the whole CSV.
+  - Applied candidates: 157 orange 0-12m endpoint connectors, 2,915 split candidates, and prerequisite node merges. Excluded red 12-20m connectors and proposed bridges.
+  - Current review overlay: `runtime/graphhopper/topology/gangseo_four_dong_v7_after_0_12_split_review_overlay_analysis.json` shows only 9 red 12-20m connectors and 103 blue proposed bridges.
+  - Validation: merged v7 validation passed with 46,713 segments, 48,911 nodes, and no bad references, bad geometries, duplicate edge IDs, self-loops, isolated nodes, or enum violations.
+- [x] 2026-05-03: 4개 동 검수 편집기를 bbox 기준보다 1km 확장한 proposed-bridge-only 프리뷰로 전환했다.
+  - Preview scope: `gangseo_four_dong_plus1km_road_segments_v7_after_0_12_split.csv` and `gangseo_four_dong_plus1km_road_nodes_v7_after_0_12_split.csv` contain the current v7 graph after 0-12m/split application, clipped by each target dong bbox plus roughly 1km.
+  - Connector overlay: `gangseo_four_dong_plus1km_v7_after_0_12_split_bridge_only_analysis.json` intentionally clears orange/red/yellow connector candidates and displays only blue proposed bridges.
+  - Current counts: expanded preview has 15,532 segments, 14,102 nodes, 648 components, and 647 proposed bridge candidates.
+  - Server mode: `GANGSEO_GRAPH_BBOX_BUFFER_METER=1000` keeps `/api/segment-02c/payload?dong=gangseo_four` aligned with the expanded preview instead of the original tight dong bboxes.
+- [x] 2026-05-03: `Edit CSV` 후 지도와 proposed bridge를 즉시 재계산하도록 편집 서버를 갱신했다.
+  - API behavior: `/api/segment-02c/apply-edits` now applies the manual edits, rebuilds connectivity, replaces the in-memory proposed bridge overlay, and returns the recalculated summary in the same response.
+  - UI behavior: the editor now reloads the current graph payload and connector candidates after `Edit CSV` instead of depending on a full page refresh.
+  - Performance: `bridge_remaining_components.py` now uses an STRtree lookup for nearest-main-segment bridge generation so repeated review cycles complete interactively on the 1km expanded four-dong slice.
+- [x] 2026-05-03: 수정된 v7 기반 4동+1km live slice에 0-12m/split/node-merge를 재적용하고 1km 이내 proposed bridge만 표시했다.
+  - Input state: current live slice had 14,668 segments, 13,253 nodes, and 539 components after prior manual edits.
+  - Applied candidates: 127 orange 0-12m endpoint connectors, 102 split candidates, and 240 prerequisite node merges; red 12-20m connectors remained excluded.
+  - Output state: `gangseo_four_dong_plus1km_current_v7_live_0_12_split_segments.csv` / `...nodes.csv` validate with 14,839 segments, 12,932 nodes, and 197 components.
+  - Bridge display: `GANGSEO_BRIDGE_MAX_DISTANCE_METER=1000` limits the proposed bridge overlay to 148 blue candidates within 1km of the main component.
+- [x] 2026-05-03: `Edit CSV` apply flow now automatically runs 0-12m/split/node-merge before reconnecting proposed bridges.
+  - Apply order: manual edits are written to the active CSV, then the server analyzes the edited graph, applies orange 0-12m connectors, split connectors, and prerequisite node merges, excludes red 12-20m connectors, and finally rebuilds the 1km-limited proposed bridge overlay.
+  - UI feedback: the editor toast reports auto connector, split, and merge counts before reloading the updated map and bridge candidates.
+  - Current refreshed state after one endpoint-driven auto pass: 14,840 segments, 12,796 nodes, 102 components, and 97 proposed bridge candidates within 1km.
+- [x] 2026-05-03: 4동+1km live editor graph reached the current bridge-review terminal state.
+  - Current API state: 14,855 segments, 12,648 nodes, 2 components, 903 endpoints, and 0 proposed bridge candidates within 1km.
+  - Interpretation: the editor showing bridge count 0 is expected for the current active CSV state; the remaining non-main component does not generate a bridge candidate under the current 1km bridge rule.
+  - Reproduction notes: `.ai/MEMORY/gangseo-connectivity-preprocessing.md` records the source/runtime files, editor server command, and future-session prompt for this preprocessing flow.
+- [x] 2026-05-03: 4동+1km live editor graph를 강서구 전체 v7 원본의 나머지 구역과 병합해 v8 CSV를 생성했다.
+  - Outputs: `etl/raw/gangseo_road_segments_v8.csv`, `etl/raw/gangseo_road_nodes_v8.csv`, `runtime/graphhopper/topology/gangseo_v8_merge_report.json`, and `runtime/graphhopper/topology/gangseo_v8_validate_report.json`.
+  - Merge rule: full v7에서 live slice edgeId와 겹치거나 4동+1km expanded bbox에 걸리는 segment를 제거하고, live slice를 우선 삽입했다. Node CSV는 최종 segment 참조 기준으로 재구성했고 duplicate `vertexId`는 live row를 우선했다.
+  - V8 validation: 46,036 segments, 47,489 nodes, 5,152 connected components, and no bad references, bad geometries, endpoint mismatches, duplicate IDs, self-loops, enum violations, or isolated nodes.
+  - Accepted existing condition: duplicate node-pair edges remain 471, down from 493 in full v7; this is pre-existing full-Gangseo reverse/parallel edge cleanup outside the 4동 connector scope.
+- [x] 2026-05-03: 4동+1km 범위는 v7 원본을 유지하고 나머지 강서구 범위는 `v8_eungseo` 데이터셋으로 교체한 새 v8 기준 CSV를 생성했다.
+  - Outputs: `etl/raw/gangseo_road_segments_v8.csv`, `etl/raw/gangseo_road_nodes_v8.csv`, `runtime/graphhopper/topology/gangseo_v8_v7_scope_eungseo_remainder_merge_report.json`, and `runtime/graphhopper/topology/gangseo_v8_v7_scope_eungseo_remainder_validate_report.json`.
+  - Merge rule: `gangseo_road_segments_v7.csv`에서 신호동/녹산동/화전동/명지동 expanded bbox(1km)를 포함하는 segment 15,532개를 선택하고, `gangseo_road_segments_v8_eungseo.csv`에서는 같은 범위와 겹치지 않는 segment 32,241개를 선택했다.
+  - Schema policy: output은 v7 node/segment 컬럼을 기준으로 고정했고, eungseo-only 컬럼(`rampState`, `elevatorState`, `crossingState`)은 적재하지 않았다. eungseo의 `ROAD_BOUNDARY` 계열 segmentType은 downstream enum에 맞춰 `SIDE_LINE`으로 정규화했다.
+  - Validation: 47,772 segments, 50,430 nodes, 6,238 connected components, and no bad references, bad geometries, endpoint mismatches, duplicate IDs, self-loops, enum violations, or isolated nodes.
+  - Next target: 4동+1km 바깥의 eungseo 기반 remainder graph에서 component 수를 줄이는 connector 작업을 진행한다.
+- [x] 2026-05-03: 강서구 전체 v8 graph에 0-12m/split/prerequisite node merge connector 전처리를 적용하고 v9 CSV를 생성했다.
+  - Outputs: `etl/raw/gangseo_road_segments_v9.csv`, `etl/raw/gangseo_road_nodes_v9.csv`, `runtime/graphhopper/topology/gangseo_all_v8_final_merge_report.json`, and `runtime/graphhopper/topology/gangseo_all_v8_final_validate_report.json`.
+  - Scope: v8 전체를 presliced 작업 대상으로 사용해 기존 4동+1km 내부 연결뿐 아니라 다른 동과의 접점까지 같은 connector review flow에서 다룬다.
+  - Applied candidates: 2,091 orange 0-12m endpoint connectors, 1,638 split candidates, and 2,431 prerequisite node merges; red 12-20m connectors and proposed bridges were not auto-applied.
+  - Result: 47,772 segments / 50,430 nodes / 6,238 components became 50,525 segments / 48,054 nodes / 2,036 components after auto preprocessing.
+  - Bridge review: `runtime/graphhopper/topology/gangseo_all_v8_0_12_split_bridge_only_analysis.json` keeps only 1,062 proposed bridge candidates within 1km for manual review.
+  - Validation: v9 passes graph validation with no bad references, bad geometries, endpoint mismatches, duplicate IDs, self-loops, enum violations, or isolated nodes; duplicate node-pair edges remain 29.
+- [x] 2026-05-03: 강서구 전체 connector editor를 동별 +1km 검수 모드로 전환했다.
+  - UI: `etl/noksan_sinho_songjeong_hwajeon_segment_02c_graph_edit.html` now has a scope selector for `강서구 전체` and each Gangseo dong, defaulting to `명지동` to avoid loading the full graph on first open.
+  - API: `etl/scripts/27_serve_gangseo_connector_editor.py` now serves `/api/segment-02c/payload?dong=<id>` from the live graph CSV using the selected dong bbox plus `GANGSEO_GRAPH_BBOX_BUFFER_METER=1000`.
+  - Bridge overlay: `/api/gangseo-connectivity-data` is queried with the same selected bbox, so the page shows only bridge candidates relevant to the chosen dong +1km review area.

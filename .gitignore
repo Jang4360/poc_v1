@@ -23,3 +23,4 @@ etl/*.log
 runtime/
 __pycache__/
 *.pyc
+graphhopper-plugin/target/

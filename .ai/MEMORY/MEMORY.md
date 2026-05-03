@@ -7,6 +7,7 @@ Use this directory for durable repository memory that should persist beyond a si
 - `debugging.md`: recurring debugging patterns, root causes, and reproduction shortcuts
 - `conventions.md`: naming, structure, documentation, and workflow norms
 - `incidents.md`: important failures, customer-impacting events, and follow-up notes
+- `gangseo-connectivity-preprocessing.md`: Gangseo four-dong connector preprocessing, editor runtime files, and repeat commands
 
 ## Rules
 

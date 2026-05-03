@@ -58,6 +58,11 @@
       border-color: #0f172a;
       color: #ffffff;
     }
+    .scope-select {
+      min-width: 128px;
+      border-color: #94a3b8;
+      font-weight: 700;
+    }
     #map.roadview-pick-mode {
       cursor: crosshair;
     }
@@ -65,6 +70,60 @@
       color: #475569;
       padding: 0 6px;
       white-space: nowrap;
+    }
+    .connector-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      min-width: min(100%, 720px);
+      padding: 6px 4px 2px;
+      border-top: 1px solid #e2e8f0;
+    }
+    .connector-tabs label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 24px;
+      white-space: nowrap;
+    }
+    .connector-tabs input {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+    }
+    .connector-tabs .swatch {
+      width: 28px;
+      height: 4px;
+      border-radius: 999px;
+      display: inline-block;
+      background: #111827;
+    }
+    .connector-tabs .summary {
+      color: #475569;
+      padding-left: 4px;
+    }
+    .bridge-marker {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 3px solid #ffffff;
+      background: #0369a1;
+      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.45);
+      color: #ffffff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1;
+      padding: 0;
+      transform: translate(-50%, -50%);
+    }
+    .bridge-marker:hover {
+      background: #0ea5e9;
+      transform: translate(-50%, -50%) scale(1.12);
     }
     .side-panel {
       position: absolute;
@@ -206,7 +265,7 @@
 <body>
   <div id="map"></div>
   <div class="toolbar">
-    <select id="district-select" aria-label="동 선택"></select>
+    <select id="area-select" class="scope-select" aria-label="review area"></select>
     <button id="mode-pan" class="active" type="button">Select</button>
     <button id="mode-delete" type="button">Delete</button>
     <button id="mode-add" type="button">Add</button>
@@ -223,6 +282,14 @@
     <button id="box-delete-drag" class="danger hidden" type="button">Drag</button>
     <button id="box-delete-apply" class="danger hidden" type="button">Delete all</button>
     <span id="visible-stat" class="stat">visible -</span>
+    <div class="connector-tabs" aria-label="connector layers">
+      <label><input type="checkbox" data-connector-layer="base" checked><span class="swatch" style="background:#000000"></span>기존 segment</label>
+      <label><input type="checkbox" data-connector-layer="orange" checked><span class="swatch" style="background:#f97316"></span>0-12m connector</label>
+      <label><input type="checkbox" data-connector-layer="red" checked><span class="swatch" style="background:#ef4444"></span>12-20m connector</label>
+      <label><input type="checkbox" data-connector-layer="yellow" checked><span class="swatch" style="background:#facc15"></span>split connector</label>
+      <label><input type="checkbox" data-connector-layer="blue" checked><span class="swatch" style="background:#38bdf8"></span>proposed bridge</label>
+      <span id="connector-summary" class="summary">connectors -</span>
+    </div>
   </div>
   <aside class="side-panel">
     <div class="panel-header">
@@ -254,13 +321,34 @@
   <div id="toast" class="toast hidden"></div>
   <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=fc0455f117ec0c48766f39c9673f18f0"></script>
   <script>
-    const districtPayloads = {};
-    const lazyPayloadEndpoint = "/api/segment-02c/payload";
-    const dongAreas = [{"id": "gangseo_all", "name": "강서구 전체", "bbox": {"minLon": 128.765, "minLat": 34.993, "maxLon": 128.998, "maxLat": 35.236}}, {"id": "myeongji", "name": "명지동", "bbox": {"minLon": 128.895, "minLat": 35.08, "maxLon": 128.94, "maxLat": 35.12}}, {"id": "sinho", "name": "신호동", "bbox": {"minLon": 128.858, "minLat": 35.075, "maxLon": 128.895, "maxLat": 35.105}}, {"id": "noksan", "name": "녹산동", "bbox": {"minLon": 128.815, "minLat": 35.075, "maxLon": 128.858, "maxLat": 35.135}}, {"id": "hwajeon", "name": "화전동", "bbox": {"minLon": 128.858, "minLat": 35.105, "maxLon": 128.895, "maxLat": 35.135}}, {"id": "songjeong", "name": "송정동", "bbox": {"minLon": 128.815, "minLat": 35.045, "maxLon": 128.865, "maxLat": 35.085}}, {"id": "mium", "name": "미음동", "bbox": {"minLon": 128.835, "minLat": 35.135, "maxLon": 128.895, "maxLat": 35.175}}, {"id": "jisa", "name": "지사동", "bbox": {"minLon": 128.83, "minLat": 35.14, "maxLon": 128.895, "maxLat": 35.185}}, {"id": "saenggok", "name": "생곡동", "bbox": {"minLon": 128.855, "minLat": 35.125, "maxLon": 128.905, "maxLat": 35.165}}, {"id": "beombang", "name": "범방동", "bbox": {"minLon": 128.875, "minLat": 35.12, "maxLon": 128.925, "maxLat": 35.165}}, {"id": "gurang", "name": "구랑동", "bbox": {"minLon": 128.835, "minLat": 35.105, "maxLon": 128.875, "maxLat": 35.145}}, {"id": "garak", "name": "가락동", "bbox": {"minLon": 128.825, "minLat": 35.175, "maxLon": 128.925, "maxLat": 35.235}}, {"id": "gangdong", "name": "강동동", "bbox": {"minLon": 128.895, "minLat": 35.18, "maxLon": 128.965, "maxLat": 35.235}}, {"id": "daejeo1", "name": "대저1동", "bbox": {"minLon": 128.94, "minLat": 35.19, "maxLon": 129.005, "maxLat": 35.235}}, {"id": "daejeo2", "name": "대저2동", "bbox": {"minLon": 128.9, "minLat": 35.13, "maxLon": 129.005, "maxLat": 35.2}}, {"id": "gonghang", "name": "공항동", "bbox": {"minLon": 128.92, "minLat": 35.145, "maxLon": 128.995, "maxLat": 35.2}}, {"id": "gadeokdo", "name": "가덕도동", "bbox": {"minLon": 128.765, "minLat": 34.993, "maxLon": 128.855, "maxLat": 35.075}}];
-    const defaultAreaId = "sinho";
+    const apiOrigin = (location.protocol === "file:" || location.port === "3000") ? "http://127.0.0.1:3003" : "";
+    const lazyPayloadEndpoint = `${apiOrigin}/api/segment-02c/payload`;
+    const connectorDataEndpoint = `${apiOrigin}/api/gangseo-connectivity-data`;
+    const dongAreas = [
+      {"id": "gangseo_all", "name": "강서구 전체", "bbox": {"minLon": 128.765, "minLat": 34.993, "maxLon": 128.998, "maxLat": 35.236}},
+      {"id": "myeongji", "name": "명지동", "bbox": {"minLon": 128.895, "minLat": 35.08, "maxLon": 128.94, "maxLat": 35.12}},
+      {"id": "sinho", "name": "신호동", "bbox": {"minLon": 128.858, "minLat": 35.075, "maxLon": 128.895, "maxLat": 35.105}},
+      {"id": "noksan", "name": "녹산동", "bbox": {"minLon": 128.815, "minLat": 35.075, "maxLon": 128.858, "maxLat": 35.135}},
+      {"id": "hwajeon", "name": "화전동", "bbox": {"minLon": 128.858, "minLat": 35.105, "maxLon": 128.895, "maxLat": 35.135}},
+      {"id": "songjeong", "name": "송정동", "bbox": {"minLon": 128.815, "minLat": 35.045, "maxLon": 128.865, "maxLat": 35.085}},
+      {"id": "mium", "name": "미음동", "bbox": {"minLon": 128.835, "minLat": 35.135, "maxLon": 128.895, "maxLat": 35.175}},
+      {"id": "jisa", "name": "지사동", "bbox": {"minLon": 128.83, "minLat": 35.14, "maxLon": 128.895, "maxLat": 35.185}},
+      {"id": "saenggok", "name": "생곡동", "bbox": {"minLon": 128.855, "minLat": 35.125, "maxLon": 128.905, "maxLat": 35.165}},
+      {"id": "beombang", "name": "범방동", "bbox": {"minLon": 128.875, "minLat": 35.12, "maxLon": 128.925, "maxLat": 35.165}},
+      {"id": "gurang", "name": "구랑동", "bbox": {"minLon": 128.835, "minLat": 35.105, "maxLon": 128.875, "maxLat": 35.145}},
+      {"id": "garak", "name": "가락동", "bbox": {"minLon": 128.825, "minLat": 35.175, "maxLon": 128.925, "maxLat": 35.235}},
+      {"id": "gangdong", "name": "강동동", "bbox": {"minLon": 128.895, "minLat": 35.18, "maxLon": 128.965, "maxLat": 35.235}},
+      {"id": "daejeo1", "name": "대저1동", "bbox": {"minLon": 128.94, "minLat": 35.19, "maxLon": 129.005, "maxLat": 35.235}},
+      {"id": "daejeo2", "name": "대저2동", "bbox": {"minLon": 128.9, "minLat": 35.13, "maxLon": 129.005, "maxLat": 35.2}},
+      {"id": "gonghang", "name": "공항동", "bbox": {"minLon": 128.92, "minLat": 35.145, "maxLon": 128.995, "maxLat": 35.2}},
+      {"id": "gadeokdo", "name": "가덕도동", "bbox": {"minLon": 128.765, "minLat": 34.993, "maxLon": 128.855, "maxLat": 35.075}}
+    ];
+    const queryParams = new URLSearchParams(window.location.search);
+    const requestedAreaId = queryParams.get("dong");
+    const defaultAreaId = dongAreas.some(item => item.id === requestedAreaId) ? requestedAreaId : "myeongji";
     let activeAreaId = defaultAreaId;
-    let activeDistrict = "";
-    let payload = districtPayloads[Object.keys(districtPayloads)[0]] || null;
+    let activeDistrict = "강서구";
+    let payload = null;
     const segmentStyles = {"CENTERLINE": {"strokeColor": "#111827", "strokeWeight": 3, "strokeOpacity": 0.84}, "SIDE_LINE": {"strokeColor": "#dc2626", "strokeWeight": 3, "strokeOpacity": 0.84}, "ROAD_BOUNDARY": {"strokeColor": "#dc2626", "strokeWeight": 4, "strokeOpacity": 0.9}, "ROAD_BOUNDARY_INNER": {"strokeColor": "#dc2626", "strokeWeight": 3, "strokeOpacity": 0.84}, "SIDE_WALK": {"strokeColor": "#2563eb", "strokeWeight": 3, "strokeOpacity": 0.9}, "SIDE_LEFT": {"strokeColor": "#dc2626", "strokeWeight": 3, "strokeOpacity": 0.84}, "SIDE_RIGHT": {"strokeColor": "#dc2626", "strokeWeight": 3, "strokeOpacity": 0.84}, "TRANSITION_CONNECTOR": {"strokeColor": "#7c3aed", "strokeWeight": 3, "strokeOpacity": 0.9}, "GAP_BRIDGE": {"strokeColor": "#f59e0b", "strokeWeight": 3, "strokeOpacity": 0.92}, "CORNER_BRIDGE": {"strokeColor": "#ea580c", "strokeWeight": 3, "strokeOpacity": 0.94}, "SAME_SIDE_CORNER_BRIDGE": {"strokeColor": "#f97316", "strokeWeight": 3, "strokeOpacity": 0.94}, "CROSS_SIDE_CORNER_BRIDGE": {"strokeColor": "#8b5cf6", "strokeWeight": 3, "strokeOpacity": 0.94}, "CROSSING": {"strokeColor": "#059669", "strokeWeight": 3, "strokeOpacity": 0.9}, "ELEVATOR_CONNECTOR": {"strokeColor": "#0ea5e9", "strokeWeight": 3, "strokeOpacity": 0.9}};
     const addableSegmentTypes = ["SIDE_LINE", "SIDE_WALK"];
     const sourceVersion = "02c_graph_materialized";
@@ -271,8 +359,8 @@
     let selectedStart = null;
     let addPreviewMarkers = [];
     let manualEdits = [];
-    const maxInteractiveSegmentOverlays = 3600;
-    const maxInteractiveNodeOverlays = 5000;
+    const maxInteractiveSegmentOverlays = 12000;
+    const maxInteractiveNodeOverlays = 14000;
     const editPreviewLimit = 80;
     const editJsonPreviewLimit = 120;
     let renderVisibleTimer = null;
@@ -283,13 +371,24 @@
     let roadview = null;
     let roadviewClient = null;
     let roadviewMarker = null;
+    let connectorFeatures = [];
+    let connectorSummary = {};
+    const connectorColors = {
+      orange: "#f97316",
+      red: "#ef4444",
+      yellow: "#facc15",
+      blue: "#38bdf8"
+    };
+    const connectorVisibleCounts = { orange: 0, red: 0, yellow: 0, blue: 0 };
+    const connectorLoadedCounts = { orange: 0, red: 0, yellow: 0, blue: 0 };
 
     const mapEl = document.getElementById("map");
+    const areaSelectEl = document.getElementById("area-select");
     const visibleStat = document.getElementById("visible-stat");
+    const connectorSummaryEl = document.getElementById("connector-summary");
     const editsEl = document.getElementById("edits");
     const editsJsonEl = document.getElementById("edits-json");
     const toastEl = document.getElementById("toast");
-    const districtSelectEl = document.getElementById("district-select");
     const targetTypeEl = document.getElementById("target-type");
     const segmentTypeEl = document.getElementById("segment-type");
     const boxDeleteDragEl = document.getElementById("box-delete-drag");
@@ -365,16 +464,6 @@
       segmentTypeEl.value = addableSegmentTypes.includes(selected) ? selected : addableSegmentTypes[0];
     }
 
-    function renderDistrictOptions() {
-      const options = dongAreas.length
-        ? dongAreas
-        : Object.keys(districtPayloads).map(district => ({ id: district, name: district }));
-      districtSelectEl.innerHTML = options
-        .map(area => `<option value="${escapeText(area.id)}">${escapeText(area.name)}</option>`)
-        .join("");
-      districtSelectEl.value = activeAreaId;
-    }
-
     function loadEdits() {
       try {
         const stored = localStorage.getItem(storageKey());
@@ -420,10 +509,23 @@
       return area ? area.name : areaId;
     }
 
+    function renderAreaSelect() {
+      areaSelectEl.innerHTML = dongAreas
+        .map(item => `<option value="${escapeText(item.id)}">${escapeText(item.name)}</option>`)
+        .join("");
+      areaSelectEl.value = activeAreaId;
+    }
+
+    function bboxParamFromPayload(graphPayload) {
+      const bbox = graphPayload?.meta?.selectionBbox || graphPayload?.meta?.bbox;
+      if (!bbox) return "";
+      if (Array.isArray(bbox)) return bbox.join(",");
+      const values = [bbox.minLon, bbox.minLat, bbox.maxLon, bbox.maxLat];
+      if (values.every(Number.isFinite)) return values.join(",");
+      return "";
+    }
+
     async function loadPayloadForArea(areaId) {
-      if (!lazyPayloadEndpoint) {
-        return districtPayloads[areaId] || Object.values(districtPayloads)[0] || null;
-      }
       const url = new URL(lazyPayloadEndpoint, window.location.origin);
       url.searchParams.set("dong", areaId);
       const response = await fetch(url.toString());
@@ -434,10 +536,42 @@
       return result.payload;
     }
 
+    async function loadConnectorCandidates(graphPayload) {
+      try {
+        const url = new URL(connectorDataEndpoint, window.location.origin);
+        url.searchParams.set("colors", "orange,red,yellow,blue");
+        url.searchParams.set("limit", "10000");
+        const bboxParam = bboxParamFromPayload(graphPayload);
+        if (bboxParam) url.searchParams.set("bbox", bboxParam);
+        const response = await fetch(url.toString());
+        const result = await response.json();
+        if (!response.ok || !result.ok) {
+          throw new Error(result.error || `HTTP ${response.status}`);
+        }
+        connectorFeatures = result.candidates?.features || [];
+        connectorSummary = result.summary || {};
+        resetConnectorLoadedCounts();
+        connectorFeatures.forEach(feature => {
+          const color = feature.properties?.color;
+          if (color in connectorLoadedCounts) connectorLoadedCounts[color] += 1;
+        });
+        renderConnectorSummary();
+      } catch (error) {
+        connectorFeatures = [];
+        connectorSummary = {};
+        resetConnectorLoadedCounts();
+        connectorSummaryEl.textContent = `connectors load failed: ${error.message}`;
+      }
+    }
+
     async function switchDistrict(nextAreaId) {
       activeAreaId = nextAreaId;
-      activeDistrict = areaName(nextAreaId);
+      if (areaSelectEl.value !== nextAreaId) areaSelectEl.value = nextAreaId;
+      activeDistrict = "강서구";
       payload = null;
+      connectorFeatures = [];
+      connectorSummary = {};
+      resetConnectorLoadedCounts();
       clearOverlays();
       clearSelectionPolygon();
       setBoxDeleteEnabled(false);
@@ -445,12 +579,17 @@
       renderEdits();
       visibleStat.textContent = "loading...";
       try {
-        payload = await loadPayloadForArea(nextAreaId);
+        const graphPayload = await loadPayloadForArea(nextAreaId);
+        payload = graphPayload;
+        await loadConnectorCandidates(graphPayload);
       } catch (error) {
-        showToast(`동 데이터를 불러오지 못했습니다: ${error.message}`);
+        showToast(`데이터를 불러오지 못했습니다: ${error.message}`);
         visibleStat.textContent = "load failed";
         return;
       }
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.set("dong", nextAreaId);
+      window.history.replaceState({}, "", nextUrl.toString());
       activeDistrict = payload.meta.districtGu || activeDistrict;
       manualEdits = loadEdits();
       selectedStart = null;
@@ -934,6 +1073,111 @@
       overlays.push(marker);
     }
 
+    function connectorLayerChecked(layer) {
+      const input = document.querySelector(`input[data-connector-layer="${layer}"]`);
+      return !input || input.checked;
+    }
+
+    function selectedConnectorColors() {
+      return ["orange", "red", "yellow", "blue"].filter(connectorLayerChecked);
+    }
+
+    function resetConnectorVisibleCounts() {
+      Object.keys(connectorVisibleCounts).forEach(key => {
+        connectorVisibleCounts[key] = 0;
+      });
+    }
+
+    function resetConnectorLoadedCounts() {
+      Object.keys(connectorLoadedCounts).forEach(key => {
+        connectorLoadedCounts[key] = 0;
+      });
+    }
+
+    function renderConnectorSummary() {
+      const counts = connectorSummary.candidateColorCounts || {};
+      connectorSummaryEl.textContent = [
+        `components ${connectorSummary.componentCount || 0}`,
+        `endpoints ${connectorSummary.endpointCount || 0}`,
+        `0-12m ${connectorLoadedCounts.orange || counts.orange || 0}/${connectorVisibleCounts.orange}`,
+        `12-20m ${connectorLoadedCounts.red || counts.red || 0}/${connectorVisibleCounts.red}`,
+        `split ${connectorLoadedCounts.yellow || counts.yellow || 0}/${connectorVisibleCounts.yellow}`,
+        `bridge ${connectorLoadedCounts.blue || counts.blue || 0}/${connectorVisibleCounts.blue}`
+      ].join(" | ");
+    }
+
+    function addConnectorOverlay(feature) {
+      const props = feature.properties || {};
+      const colorKey = props.color || "";
+      if (!selectedConnectorColors().includes(colorKey)) return;
+      if (!lineInBox(feature.geometry.coordinates, boundsToBox(map.getBounds()))) return;
+      const detail = [
+        props.candidateId || "connector",
+        props.type || "",
+        props.priority || "",
+        props.distanceMeter != null ? `${props.distanceMeter}m` : ""
+      ].filter(Boolean).join(" ");
+      const style = {
+        strokeColor: connectorColors[colorKey] || "#38bdf8",
+        strokeWeight: props.type === "SPLIT_AND_CONNECT" ? 5 : 4,
+        strokeOpacity: 0.96,
+        strokeStyle: colorKey === "yellow" || colorKey === "blue" ? "shortdash" : "solid"
+      };
+      const line = new kakao.maps.Polyline({
+        map,
+        path: feature.geometry.coordinates.map(latLngFromCoord),
+        strokeColor: style.strokeColor,
+        strokeWeight: style.strokeWeight,
+        strokeOpacity: style.strokeOpacity,
+        strokeStyle: style.strokeStyle,
+        zIndex: 12
+      });
+      kakao.maps.event.addListener(line, "click", () => {
+        showToast(detail);
+      });
+      overlays.push(line);
+      if (colorKey === "blue") {
+        const coords = feature.geometry.coordinates || [];
+        const first = coords[0];
+        const last = coords[coords.length - 1] || first;
+        if (first && last) {
+          const markerEl = document.createElement("button");
+          markerEl.type = "button";
+          markerEl.className = "bridge-marker";
+          markerEl.textContent = "B";
+          markerEl.title = detail;
+          markerEl.setAttribute("aria-label", detail);
+          markerEl.addEventListener("click", event => {
+            event.stopPropagation();
+            showToast(detail);
+          });
+          const marker = new kakao.maps.CustomOverlay({
+            map,
+            position: latLngFromCoord([(Number(first[0]) + Number(last[0])) / 2, (Number(first[1]) + Number(last[1])) / 2]),
+            content: markerEl,
+            xAnchor: 0.5,
+            yAnchor: 0.5,
+            zIndex: 30
+          });
+          overlays.push(marker);
+        }
+      }
+      if (colorKey in connectorVisibleCounts) connectorVisibleCounts[colorKey] += 1;
+    }
+
+    function addConnectorOverlays(box) {
+      resetConnectorVisibleCounts();
+      if (!connectorFeatures.length) {
+        renderConnectorSummary();
+        return;
+      }
+      connectorFeatures
+        .filter(feature => feature.geometry?.type === "LineString")
+        .filter(feature => lineInBox(feature.geometry.coordinates, box))
+        .forEach(addConnectorOverlay);
+      renderConnectorSummary();
+    }
+
     function scheduleRenderVisible() {
       if (renderVisibleTimer) window.clearTimeout(renderVisibleTimer);
       renderVisibleTimer = window.setTimeout(() => {
@@ -970,14 +1214,17 @@
         .filter(feature => lineInBox(feature.geometry.coordinates, box));
       if (visibleSegments.length > maxInteractiveSegmentOverlays) {
         visibleStat.textContent = `visible segments ${visibleSegments.length}; zoom in for interactive render (limit ${maxInteractiveSegmentOverlays}), edits ${manualEdits.length}`;
+        addConnectorOverlays(box);
         return;
       }
       const visibleNodeIds = new Set();
-      visibleSegments.forEach(feature => {
-        visibleNodeIds.add(feature.properties.fromNodeId);
-        visibleNodeIds.add(feature.properties.toNodeId);
-        addLine(feature);
-      });
+      if (connectorLayerChecked("base")) {
+        visibleSegments.forEach(feature => {
+          visibleNodeIds.add(feature.properties.fromNodeId);
+          visibleNodeIds.add(feature.properties.toNodeId);
+          addLine(feature);
+        });
+      }
       const visibleNodes = payload.layers.roadNodes.features
         .filter(feature => visibleNodeIds.has(feature.properties.vertexId))
         .filter(feature => !hiddenNodes.has(feature.properties.vertexId));
@@ -992,6 +1239,7 @@
         .filter(edit => edit.action === "add_node")
         .filter(edit => pointInBox(edit.geom.coordinates, box))
         .forEach(addManualNodeOverlay);
+      addConnectorOverlays(box);
       const nodeText = visibleNodes.length > maxInteractiveNodeOverlays ? `${visibleNodes.length} (hidden; zoom in)` : visibleNodes.length;
       visibleStat.textContent = `visible segments ${visibleSegments.length}, nodes ${nodeText}, edits ${manualEdits.length}`;
     }
@@ -1116,10 +1364,12 @@
 
     function applyEndpointCandidates() {
       const endpoints = [];
+      if (apiOrigin) {
+        endpoints.push(`${apiOrigin}/api/segment-02c/apply-edits`);
+      }
       if (window.location.protocol === "http:" || window.location.protocol === "https:") {
         endpoints.push(`${window.location.origin}/api/segment-02c/apply-edits`);
       }
-      endpoints.push("http://127.0.0.1:3000/api/segment-02c/apply-edits");
       return [...new Set(endpoints)];
     }
 
@@ -1140,8 +1390,17 @@
           }
           manualEdits = [];
           persistEdits();
-          showToast(`CSV updated: ${result.csv.segmentCount} segments`);
-          window.setTimeout(() => window.location.reload(), 1200);
+          const auto = result.autoConnectivity || {};
+          const autoText = [
+            `connector ${auto.addedOrangeConnectors ?? 0}`,
+            `split ${auto.acceptedYellowCandidates ?? 0}`,
+            `merge ${auto.appliedNodeMerges ?? 0}`
+          ].join(", ");
+          showToast(`CSV updated; auto ${autoText}; reconnecting bridges...`);
+          await switchDistrict(activeAreaId);
+          const components = result.summary?.componentCount ?? connectorSummary.componentCount ?? "-";
+          const bridges = result.summary?.bridgeCandidateCount ?? connectorSummary.bridgeCandidateCount ?? connectorSummary.candidateColorCounts?.blue ?? "-";
+          showToast(`map refreshed: components ${components}, bridge ${bridges}`);
           return;
         } catch (error) {
           lastError = error;
@@ -1267,19 +1526,20 @@
       scheduleRenderVisible();
       showToast("manual_edits cleared");
     });
-    districtSelectEl.addEventListener("change", event => switchDistrict(event.target.value));
+    document.querySelectorAll("input[data-connector-layer]").forEach(input => {
+      input.addEventListener("change", scheduleRenderVisible);
+    });
+    areaSelectEl.addEventListener("change", () => switchDistrict(areaSelectEl.value));
     targetTypeEl.addEventListener("change", () => {
       selectedStart = null;
       addPreviewMarkers.forEach(marker => marker.setMap(null));
       addPreviewMarkers = [];
       showToast(`target: ${targetTypeEl.value}`);
     });
-    renderDistrictOptions();
+    renderAreaSelect();
     renderPanelHeader();
     renderEdits();
-    if (districtSelectEl.value) {
-      switchDistrict(districtSelectEl.value);
-    }
+    switchDistrict(defaultAreaId);
   </script>
 </body>
 </html>

@@ -1,0 +1,77 @@
+{
+  "outputs": {
+    "nodeCsv": "etl/raw/gangseo_road_nodes_v7.csv",
+    "segmentCsv": "etl/raw/gangseo_road_segments_v6.csv"
+  },
+  "sources": {
+    "base": {
+      "nodeCsv": "etl/raw/gangseo_road_nodes_v6.csv",
+      "segmentCsv": "etl/raw/gangseo_road_segments_v6_jooyoon.csv"
+    },
+    "replacement": {
+      "nodeCsv": "etl/raw/gangseo_road_nodes_v7_eungseo.csv",
+      "segmentCsv": "etl/raw/gangseo_road_segments_v7_eungseo.csv"
+    }
+  },
+  "targetDongIds": [
+    "myeongji",
+    "hwajeon"
+  ],
+  "targetRule": "segment is selected when any LineString vertex falls inside the target dong bbox rectangles from GANGSEO_DONG_AREAS",
+  "base": {
+    "inputSegments": 43356,
+    "keptSegments": 38175,
+    "removedTargetSegments": 5181,
+    "removedTargetSegmentsByDongBbox": {
+      "myeongji": 3390,
+      "hwajeon": 1791
+    },
+    "outputSegmentTypeCounts": {
+      "SIDE_LINE": 37429,
+      "SIDE_WALK": 744
+    }
+  },
+  "replacement": {
+    "inputSegments": 44030,
+    "takenTargetSegments": 5914,
+    "takenTargetSegmentsByDongBbox": {
+      "myeongji": 3852,
+      "hwajeon": 2062
+    },
+    "outputSegmentTypeCounts": {
+      "SIDE_LINE": 5041,
+      "SIDE_WALK": 873
+    }
+  },
+  "output": {
+    "nodeCount": 49820,
+    "segmentCount": 44087,
+    "segmentTypeCounts": {
+      "SIDE_LINE": 42470,
+      "SIDE_WALK": 1617
+    },
+    "skippedInvalidLengthSegments": {
+      "base": 2
+    },
+    "endpointGeometryFallbacks": {
+      "replacement": 62
+    },
+    "endpointSourceNodeSnaps": {
+      "base": 76346,
+      "replacement": 11766
+    }
+  },
+  "schemaPolicy": {
+    "segmentType": "ROAD_BOUNDARY, ROAD_BOUNDARY_INNER, SIDE_LEFT, SIDE_RIGHT are normalized to SIDE_LINE; SIDE_WALK is preserved.",
+    "removedColumns": [
+      "elevatorState",
+      "crossingState",
+      "rampState"
+    ],
+    "renamedOrReplacedColumns": {
+      "rampState": "slopeState",
+      "crossingState": "signalState"
+    }
+  },
+  "idPolicy": "v7 renumbers all vertexId and edgeId sequentially, snaps segment endpoints to source nodes within 5m, falls back to segment geometry endpoints for stale references, and merges endpoint nodes with identical 8-decimal lon/lat coordinates."
+}

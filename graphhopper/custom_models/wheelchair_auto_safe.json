@@ -1,0 +1,15 @@
+{
+  "priority": [
+    { "if": "walk_access == NO", "multiply_by": "0" },
+    { "if": "stairs_state == YES", "multiply_by": "0" },
+    { "if": "width_state == NARROW", "multiply_by": "0.2" },
+    { "if": "width_state == ADEQUATE_120", "multiply_by": "0.75" },
+    { "if": "surface_state == UNPAVED", "multiply_by": "0.35" },
+    { "if": "avg_slope_percent >= 8.33", "multiply_by": "0.2" },
+    { "if": "avg_slope_percent >= 5.56", "multiply_by": "0.55" }
+  ],
+  "speed": [
+    { "if": "true", "limit_to": "foot_average_speed" }
+  ],
+  "distance_influence": 90
+}

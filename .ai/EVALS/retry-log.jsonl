@@ -23,3 +23,8 @@
 {"timestamp": "2026-04-28T12:25:38.630868Z", "signature": "gangseo-v5-corner-split-zero-length-rounded-segments", "outcome": "failed"}
 {"timestamp": "2026-04-30T00:08:40.806962Z", "signature": "segment_graph_edit_ui_pytest_timeout", "outcome": "failed"}
 {"timestamp": "2026-04-30T02:13:40.444099Z", "signature": "gangseo-v5-attribute-map-startprocess-redirect-same-file", "outcome": "failed"}
+{"timestamp": "2026-05-01T09:52:51.816112Z", "signature": "gangseo-v6-attribute-mapping-test-import-dataclass", "outcome": "failed"}
+{"timestamp": "2026-05-02T09:26:59.221245Z", "signature": "sinho-topology-repair-bbox-arg-format", "outcome": "failed"}
+{"timestamp": "2026-05-02T10:31:52.889459Z", "signature": "browser-repl-targetUrl-redeclare", "outcome": "failed"}
+{"timestamp": "2026-05-02T11:32:41.395735Z", "signature": "connectivity-test-fixture-after-priority-filter", "outcome": "failed"}
+{"timestamp": "2026-05-02T11:37:55.030072Z", "signature": "browser-kakao-load-timeout-sinho-priority", "outcome": "failed"}

@@ -18,9 +18,10 @@ services:
 
   graphhopper:
     build:
-      context: ./docker/graphhopper
+      context: .
+      dockerfile: docker/graphhopper/Dockerfile
     environment:
-      GRAPHHOPPER_PROFILES: visual_safe,visual_fast,wheelchair_safe,wheelchair_fast
+      GRAPHHOPPER_PROFILES: visual_safe,visual_fast,wheelchair_manual_safe,wheelchair_manual_fast,wheelchair_auto_safe,wheelchair_auto_fast
     ports:
       - "${GRAPHHOPPER_HOST_PORT:-18989}:8989"
     healthcheck:

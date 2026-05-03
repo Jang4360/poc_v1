@@ -1,0 +1,39 @@
+server:
+  application_connectors:
+    - type: http
+      port: 8989
+  admin_connectors:
+    - type: http
+      port: 8990
+
+graphhopper:
+  datareader.file: /data/gangseo.osm.pbf
+  graph.location: /data/graph-cache
+  graph.dataaccess.default_type: RAM_STORE
+  graph.encoded_values: >-
+    foot_access,foot_priority,foot_average_speed,
+    walk_access,avg_slope_percent,width_meter,braille_block_state,
+    audio_signal_state,slope_state,width_state,surface_state,
+    stairs_state,signal_state,segment_type
+  custom_models.directory: /config/custom_models
+  routing.non_ch.max_waypoint_distance: 1000000
+  import.osm.ignored_highways: motorway,trunk
+  profiles:
+    - name: pedestrian_safe
+      custom_model_files: [pedestrian_safe.json]
+    - name: pedestrian_fast
+      custom_model_files: [pedestrian_fast.json]
+    - name: visual_safe
+      custom_model_files: [visual_safe.json]
+    - name: visual_fast
+      custom_model_files: [visual_fast.json]
+    - name: wheelchair_manual_safe
+      custom_model_files: [wheelchair_manual_safe.json]
+    - name: wheelchair_manual_fast
+      custom_model_files: [wheelchair_manual_fast.json]
+    - name: wheelchair_auto_safe
+      custom_model_files: [wheelchair_auto_safe.json]
+    - name: wheelchair_auto_fast
+      custom_model_files: [wheelchair_auto_fast.json]
+  profiles_ch: []
+  profiles_lm: []

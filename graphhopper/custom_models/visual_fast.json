@@ -1,0 +1,11 @@
+{
+  "priority": [
+    { "if": "walk_access == NO", "multiply_by": "0" },
+    { "if": "stairs_state == YES", "multiply_by": "0.75" },
+    { "if": "braille_block_state == YES", "multiply_by": "1.05" }
+  ],
+  "speed": [
+    { "if": "true", "limit_to": "foot_average_speed" }
+  ],
+  "distance_influence": 45
+}

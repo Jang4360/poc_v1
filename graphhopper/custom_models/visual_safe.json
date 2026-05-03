@@ -1,0 +1,15 @@
+{
+  "priority": [
+    { "if": "walk_access == NO", "multiply_by": "0" },
+    { "if": "signal_state == TRAFFIC_SIGNALS", "multiply_by": "1.1" },
+    { "if": "audio_signal_state == YES", "multiply_by": "1.1" },
+    { "if": "braille_block_state == YES", "multiply_by": "1.08" },
+    { "if": "stairs_state == YES", "multiply_by": "0.45" },
+    { "if": "slope_state == RISK", "multiply_by": "0.65" },
+    { "if": "surface_state == UNPAVED", "multiply_by": "0.75" }
+  ],
+  "speed": [
+    { "if": "true", "limit_to": "foot_average_speed" }
+  ],
+  "distance_influence": 95
+}

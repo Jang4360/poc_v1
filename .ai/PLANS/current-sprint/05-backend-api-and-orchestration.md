@@ -45,10 +45,10 @@
   - `spring.jpa.hibernate.ddl-auto=validate`
   - 운영/POC 공통으로 Spring의 자동 DDL 생성은 사용하지 않는다.
   - 엔티티 필드와 `db/schema.sql` 컬럼명이 어긋나면 애플리케이션 기동 단계에서 실패하도록 한다.
-- [ ] `/api/v1/routes/search` 계약을 구현한다.
+- [x] `/api/v1/routes/search` 계약을 구현한다.
   - 입력: 사용자 축, 출발/도착 좌표, 경로 옵션
   - 출력: 옵션별 경로와 segment 정보
-- [ ] `SAFE`, `SHORTEST`는 GraphHopper 4개 프로필과 매핑한다.
+- [x] `SAFE`, `SHORTEST`는 GraphHopper 4개 프로필과 매핑한다.
 - [ ] `PUBLIC_TRANSPORT`는 ODsay/BIMS와 내부 참조 테이블을 함께 사용한다.
   - 저상버스 노선 여부 확인
   - 지하철 엘리베이터 접근 가능성 확인
@@ -59,7 +59,7 @@
 
 - [ ] 시설 조회 응답이 `places`와 `place_accessibility_features`를 일관되게 묶는지 확인한다.
 - [ ] `PUBLIC_TRANSPORT` 옵션이 참조 테이블과 외부 API를 통해 필터링되는지 검증한다.
-- [ ] GraphHopper 응답과 DB 속성 보강값이 API 응답으로 누락 없이 전달되는지 확인한다.
+- [x] GraphHopper 응답의 geometry, instructions, path details가 API 응답으로 전달되는지 확인한다.
 
 ## 위험 및 열린 질문
 

@@ -1,0 +1,11 @@
+{
+  "priority": [
+    { "if": "walk_access == NO", "multiply_by": "0" },
+    { "if": "stairs_state == YES", "multiply_by": "0.75" },
+    { "if": "surface_state == UNPAVED", "multiply_by": "0.85" }
+  ],
+  "speed": [
+    { "if": "true", "limit_to": "foot_average_speed" }
+  ],
+  "distance_influence": 35
+}

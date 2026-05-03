@@ -1,13 +1,28 @@
 # GraphHopper Plugin
 
-This directory is the execution boundary for the Busan EumGil GraphHopper integration.
+This directory is the Java/Maven execution boundary for the Gangseo EumGil GraphHopper integration.
 
-Workstream `01` creates the module boundary only. Workstream `04` will add the direct
-`road_nodes` and `road_segments` graph import, encoded values, and custom models.
+Runtime data, Docker files, GraphHopper config, PBF, and graph-cache stay under the root
+`graphhopper/` and `docker/graphhopper/` directories. This module only owns Java code:
+
+- `IeumImportRegistry`: delegates standard GraphHopper import units and adds EumGil custom units.
+- `IeumEncodedValues`: custom EV names used by `graphhopper/config.yml` and custom models.
+- `IeumEnumTagParser` / `IeumDecimalTagParser`: read `ieum:*` OSM way tags.
+- `IeumGraphHopperApplication`: starts GraphHopper with the custom import registry.
 
 Canonical profiles:
 
+- `pedestrian_safe`
+- `pedestrian_fast`
 - `visual_safe`
 - `visual_fast`
-- `wheelchair_safe`
-- `wheelchair_fast`
+- `wheelchair_manual_safe`
+- `wheelchair_manual_fast`
+- `wheelchair_auto_safe`
+- `wheelchair_auto_fast`
+
+Run:
+
+```bash
+mvn -f graphhopper-plugin/pom.xml test
+```
